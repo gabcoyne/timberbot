@@ -36,3 +36,4 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 timberbot-protocol = { path = "crates/timberbot-protocol" }
 timberbot-client = { path = "crates/timberbot-client" }
 timberbot-save = { path = "crates/timberbot-save" }
+timberbot-mock = { path = "crates/timberbot-mock" }
