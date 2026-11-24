@@ -80,7 +80,7 @@ impl McpServer {
                     "offset": {"type": "integer"}
                 }
             })),
-            tool_def("timberbot_tiles", "Inspect map size or tile rect (terrainHeight, waterDepth, contamination, moist, occupant).", json!({
+            tool_def("timberbot_tiles", "Inspect map size or tile rect (terrain, water, badwater, moist, contaminated, occupants).", json!({
                 "type": "object",
                 "properties": {
                     "x1": {"type": "integer"},

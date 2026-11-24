@@ -82,6 +82,7 @@ async fn main() -> Result<()> {
             Some(Duration::from_millis(cli.tick_ms))
         },
         days_per_tick_speed1: cli.days_per_tick,
+        ..Default::default()
     };
 
     let running = RunningMockServer::start(config, scenario).await?;

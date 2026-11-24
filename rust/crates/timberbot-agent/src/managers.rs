@@ -54,7 +54,7 @@ impl Observation {
         self.tiles
             .tiles
             .as_ref()
-            .map(|ts| ts.iter().map(|t| t.contamination).fold(0.0_f64, f64::max))
+            .map(|ts| ts.iter().map(|t| t.badwater).fold(0.0_f64, f64::max))
             .unwrap_or(0.0)
     }
 }
