@@ -1,0 +1,15 @@
+[package]
+name = "timberbot-save"
+description = "Read-only analyzer for Timberborn .timber ZIP save archives (world.json)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+timberbot-protocol.workspace = true
+zip.workspace = true
