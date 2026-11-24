@@ -12,8 +12,6 @@ timberbot/src/Library/
 dist/
 build/
 workshop_data.json
-dist/
-skills/
 site/
 .test-baselines/
 docs/reachability-investigation.md
