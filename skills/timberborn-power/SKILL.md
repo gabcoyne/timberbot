@@ -22,7 +22,7 @@ description: "Use when a Timberborn building needs power (hp) or the grid is sho
 | Wind Turbine | FT | 150 peak / ~68 average, 120 SP | depends on wind (`wind.changed` event) |
 | Large Wind Turbine | FT | 300 peak / ~144 average, 1400 SP | |
 | Steam Engine | IT | ~400 hp, burns logs (+ water per faction post) | 20 log, 25 gear, 40 metal parts |
-| Geothermal Engine | both | renewable. Output unverified | 50 log, 30 plank, 160 SP. Only on a Geothermal Field |
+| Geothermal Engine | both | **400 hp** continuous, unmanned ([wiki Geothermal Engine](https://timberborn.wiki.gg/wiki/Geothermal_Engine)) | 50 log, 30 plank, 160 SP. Only on a Geothermal Field |
 | Gravity Battery | both | stores 4,000 hph at ground level + 2,000 per block of clearance under the weight, 400 SP | buffers wind and drought |
 (Water and wind figures from 0xguy07's measurements and wiki infobox values. Treat them as ±20%.)
 

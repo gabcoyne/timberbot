@@ -10,7 +10,7 @@ Water is three things at once: **drink** (pumps and tanks), **irrigation** (mois
 ## Structures (1.1 values. SP = science to unlock)
 | Structure | Cost / SP | Behaviour |
 |---|---|---|
-| Dam | 20 logs, 0 SP | holds water to ~0.65 of a block, and overflow spills [Timberbot guide] (verify) |
+| Dam | 20 logs, 0 SP | holds water to **0.65** of a block, and overflow spills ([wiki Dam](https://timberborn.wiki.gg/wiki/Dam)) |
 | Levee | 12 logs, 120 SP | watertight 1×1 wall. Stackable, beavers walk on top |
 | Floodgate / Double / Triple | 10 log + 5 plank, 150 SP / 20+10, 250 SP / 30+15, 500 SP | adjustable spill height up to 1 / 2 / 3 blocks. When automated, it switches between a height for On and a height for Off. No walking on top |
 | Fill Valve | 5 plank, 5 metal block, 300 SP | automatically keeps the downstream water level (the old Sluice logic). Add a Contamination Sensor for badwater rejection |
@@ -21,7 +21,7 @@ Water is three things at once: **drink** (pumps and tanks), **irrigation** (mois
 | (Deep) Mechanical Pump | 50 gear, 15 treated plank, 2000 SP, 500 hp (1.1 rebalance) | lifts water |
 | Compact Mechanical Pump (1.1) | 50 gear, 25 treated plank, 25 metal block, 4000 SP, 700 hp | pumps straight through a wall. Stackable, so it enables pressurized pipes |
 | Discharge (was Fluid Dump) | 10 log, 10 plank, 250 SP | releases 3 stored water or badwater per hour as a flowing source. Use it to irrigate from tanks during drought |
-| Aquifer Drill | 40 plank, 25 gear, 15 metal block, 400 SP, needs power (~400 hp per Timberbot guide) | built over an Aquifer, produces water. Ancient Aquifer Drills come pre-placed on some maps and only need power |
+| Aquifer Drill | 40 plank, 25 gear, 15 metal block, 400 SP, **400 hp** ([wiki Aquifer Drill](https://timberborn.wiki.gg/wiki/Aquifer_Drill)) | built over an Aquifer, produces water. Ancient Aquifer Drills come pre-placed on some maps and only need power |
 | Tanks | Small 30 (15 logs) · Medium 300 (30 plank, 20 gear, 2×2) · Large 1200 (80 plank, 60 gear, 30 metal block, 3×3) | |
 Map objects: **Water Seep** (fills only to 0.8 height, gives shallow wetland water that dries fast), Badwater Seep, Badtide Drain (badwater only during badtides), Natural Dam (holds half a tile).
 
@@ -30,16 +30,16 @@ Map objects: **Water Seep** (fills only to 0.8 height, gives shallow wetland wat
 - Storage target = beavers × 2.12 × (longest expected drought + 2-day buffer). Example: 50 beavers on Normal with a 9-day drought gives ~955 water, so 4 Medium or 1 Large tank [citybuildertools].
 - Refill check: pumps must produce `storage ÷ shortest temperate length + daily drink`. Example: 120 beavers storing 2,800 water over a 13-day temperate season need ~470 water a day of pump output.
 - Recheck after any change to working hours, because pumps only run during work hours.
-- **Reservoirs beat tanks at scale.** A dammed basin holds thousands of units for a few logs, and its water also irrigates and feeds pumps. Tanks are for when there is no geography to use. Keep the reservoir floor below the inlet sill so water stays trapped when sources stop. Example: a floor 3 below the sill trapped ~650 blocks [0xguy07 map notes]. Water evaporates from open surfaces (the rate is unverified, ~0.045 a day per a fan wiki), so deep and narrow beats shallow and wide.
+- **Reservoirs beat tanks at scale.** A dammed basin holds thousands of units for a few logs, and its water also irrigates and feeds pumps. Tanks are for when there is no geography to use. Keep the reservoir floor below the inlet sill so water stays trapped when sources stop. Example: a floor 3 below the sill trapped ~650 blocks [0xguy07 map notes]. Water evaporates at `0.04608 m³ × evaporation_value` per day ([wiki Evaporation](https://timberborn.wiki.gg/wiki/Evaporation)): a ≥3-wide pool evaporates ~`0.053 m/day` per tile (adjusted adjacency score 8 → 1.16), a 2-wide channel `0.096 m/day`, and a 1-wide channel `0.200 m/day` — so avoid narrow 1-wide reservoirs and make basins deep and ≥3 tiles wide.
 
-## Irrigation (unverified wiki-sourced numbers, check with `find_planting` / `tiles moist`)
-- Moisture reach from water: a 3-wide channel or 3×3 pool reaches ~16 tiles, 2-wide ~12, 1-wide ~6. Each block of height above the water costs ~6 tiles of reach.
+## Irrigation ([wiki Irrigation](https://timberborn.wiki.gg/wiki/Irrigation) & [Evaporation](https://timberborn.wiki.gg/wiki/Evaporation); confirm live with `find_planting` / `tiles moist`)
+- Moisture reach from pure water (`0%` pollution) equals `2 × adjusted_adjacency_score`: up to **16 tiles** from a ≥3-wide channel or 3×3 pool. Each block of elevation increase costs **6 tiles** of reach (decreases in elevation do not reduce reach).
 - Soil dries after sources stop, and crops wither, then die. Keep a pool fed by a tank and a Discharge, or a dammed reservoir, beside the fields.
-- Never let badwater touch fields. Above ~50% contamination it poisons soil and kills plants.
+- Never let badwater touch fields. At **≥ 50%** contamination, water stops irrigating and contaminates terrain.
 
 ## Design patterns
 1. **First dam**: put a row of Dams across a narrow, shallow stretch downstream of the colony. It costs nothing but logs, raises the water level, widens the irrigated band, and holds a drought buffer.
-2. **Levee reservoir**: ring a depression with Levees and fill it through a Floodgate. Close the floodgate (height 0) when the drought starts so nothing drains back. With automation, use a Weather Station or Depth Sensor.
+2. **Levee reservoir**: ring a depression with Levees and fill it through a Floodgate. **Raise** the floodgate to its max height when the drought starts so nothing drains back (height `0` is wide open per [wiki Floodgates](https://timberborn.wiki.gg/wiki/Floodgates)). With automation, use a Weather Station or Depth Sensor.
 3. **Spillway power**: water falling over a dam crest or floodgate is fast. Put water wheels in the spillway channel, never in still water.
 4. **Badwater bypass**: a separate channel with its own floodgate or valve that diverts river flow around the colony during badtides (see timberborn-drought-and-badtide-response).
 5. **Deep pump siting**: pumps need depth at the intake. `find_placement` with the pump prefab sorts results by `waterDepth`. Reserve those shoreline tiles. In a drought, shallow intakes run dry first.

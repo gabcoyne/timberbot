@@ -71,4 +71,4 @@ Option (b) is the quickest way to start. Option (a) is best for always-on play w
 3. **Safety layer**: once unlocked, wire an HTTP Lever "bot kill switch" and HTTP Adapter alarms on `:8080` so control and alerts keep working if the mod breaks after a game patch.
 
 ## Status of facts
-See `SOURCES.md` for the source list and the open questions. Items marked *unverified* should be checked in game or on timberborn.wiki.gg. The wiki blocked automated fetches during drafting, so its numbers come through search snippets and wiki-derived sites.
+See `SOURCES.md` and `docs/mock-fidelity.md` for the source list, verified numbers, and remaining open questions. Items still marked *unverified* require a live Timberborn 1.1 install or playtest.
