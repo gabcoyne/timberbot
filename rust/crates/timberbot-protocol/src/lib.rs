@@ -44,7 +44,7 @@ pub fn requires_auth_token(listen_address: &str, auth_token: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::{AgentMode, AgentState, PingResponse, Summary};
+    use crate::http::{AgentMode, AgentState};
     use crate::ws::{ClientFrame, HeartbeatPayload, ServerFrame, WsEnvelope};
 
     #[test]
@@ -106,18 +106,179 @@ mod tests {
 
     #[test]
     fn golden_openapi_fixtures_deserialize() {
-        let ping_raw = include_str!("../../../../python/tests/fixtures/openapi/ping.json");
-        let ping: PingResponse = serde_json::from_str(ping_raw).unwrap();
+        use crate::http::*;
+
+        let ping: PingResponse = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/ping.json"
+        ))
+        .unwrap();
         assert_eq!(ping.status, "ok");
+        assert!(ping.ready);
         assert_eq!(ping.openapi_version, OPENAPI_VERSION);
 
-        let summary_raw = include_str!("../../../../python/tests/fixtures/openapi/summary.json");
-        let summary: Summary = serde_json::from_str(summary_raw).unwrap();
+        let settlement: SettlementName = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/settlement.json"
+        ))
+        .unwrap();
+        assert!(!settlement.name.is_empty());
+
+        let state: AgentState = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/agent_state.json"
+        ))
+        .unwrap();
+        assert!(!state.ready);
+
+        let summary: Summary = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/summary.json"
+        ))
+        .unwrap();
         assert_eq!(summary.faction, "Folktails");
         assert!(!summary.districts.is_empty());
+        assert!(summary.trees.is_some());
 
-        let state_raw = include_str!("../../../../python/tests/fixtures/openapi/agent_state.json");
-        let state: AgentState = serde_json::from_str(state_raw).unwrap();
-        assert!(!state.ready);
+        let time: TimeInfo = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/time.json"
+        ))
+        .unwrap();
+        assert!(time.day_number >= 1);
+
+        let weather: WeatherInfo = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/weather.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            weather.cycle_length_in_days,
+            weather.temperate_weather_duration + weather.hazardous_weather_duration
+        );
+
+        let speed: SpeedInfo = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/speed.json"
+        ))
+        .unwrap();
+        assert!(speed.speed <= 3);
+
+        let wh: WorkHours = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/workhours.json"
+        ))
+        .unwrap();
+        assert!(wh.end_hours >= 1.0);
+
+        let alerts: Vec<AlertItem> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/alerts.json"
+        ))
+        .unwrap();
+        assert!(alerts.is_empty());
+
+        let notifications: Vec<NotificationItem> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/notifications.json"
+        ))
+        .unwrap();
+        assert!(!notifications.is_empty());
+
+        let buildings: PaginatedList<Building> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/buildings.json"
+        ))
+        .unwrap();
+        assert_eq!(buildings.total, 1);
+        assert_eq!(buildings.items[0].name, "DistrictCenter.Folktails");
+
+        let beavers: PaginatedList<Beaver> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/beavers.json"
+        ))
+        .unwrap();
+        assert_eq!(beavers.total, 13);
+        assert_eq!(beavers.items[0].lifting_capacity, Some(14));
+
+        let trees: PaginatedList<Plant> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/trees.json"
+        ))
+        .unwrap();
+        assert!(trees.total > 0);
+
+        let crops: PaginatedList<Plant> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/crops.json"
+        ))
+        .unwrap();
+        assert_eq!(crops.limit, 100);
+        assert_eq!(crops.total, 1857);
+
+        let gatherables: PaginatedList<Gatherable> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/gatherables.json"
+        ))
+        .unwrap();
+        assert!(gatherables.total > 0);
+
+        let tree_clusters: Vec<Cluster> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/tree_clusters.json"
+        ))
+        .unwrap();
+        assert!(!tree_clusters.is_empty());
+
+        let food_clusters: Vec<Cluster> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/food_clusters.json"
+        ))
+        .unwrap();
+        assert!(!food_clusters.is_empty());
+
+        let pop: Vec<PopulationItem> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/population.json"
+        ))
+        .unwrap();
+        assert_eq!(pop[0].adults, 10);
+
+        let resources: ResourcesMap = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/resources.json"
+        ))
+        .unwrap();
+        assert!(!resources.is_empty());
+
+        let districts: Vec<District> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/districts.json"
+        ))
+        .unwrap();
+        assert!(!districts.is_empty());
+
+        let distribution: Vec<DistrictDistribution> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/distribution.json"
+        ))
+        .unwrap();
+        assert!(!distribution.is_empty());
+
+        let power: Vec<PowerNetwork> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/power.json"
+        ))
+        .unwrap();
+        assert!(!power.is_empty());
+
+        let prefabs: Vec<PrefabInfo> = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/prefabs.json"
+        ))
+        .unwrap();
+        assert_eq!(prefabs.len(), 178);
+        let farm = prefabs
+            .iter()
+            .find(|p| p.name == "EfficientFarmHouse.Folktails")
+            .expect("EfficientFarmHouse.Folktails in recorded fixture");
+        assert!(farm.unlocked);
+        assert_eq!(farm.cost[0].amount, 25);
+
+        let science: ScienceInfo = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/science.json"
+        ))
+        .unwrap();
+        assert!(!science.unlockables.is_empty());
+
+        let tiles: TilesResponse = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/tiles.json"
+        ))
+        .unwrap();
+        assert_eq!(tiles.map_size.z, 23);
+
+        let wellbeing: WellbeingReport = serde_json::from_str(include_str!(
+            "../../../../python/tests/fixtures/openapi/wellbeing.json"
+        ))
+        .unwrap();
+        let max_wb: f64 = wellbeing.categories.iter().map(|c| c.max).sum();
+        assert!((max_wb - 78.0).abs() < 1e-6);
     }
 }

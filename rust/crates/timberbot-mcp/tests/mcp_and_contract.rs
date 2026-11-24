@@ -29,6 +29,7 @@ fn mock_cfg(auth_token: &str, initial_ready: bool) -> MockServerConfig {
         initial_ready,
         tick_interval: None,
         days_per_tick_speed1: 0.25,
+        ..Default::default()
     }
 }
 
@@ -43,6 +44,7 @@ async fn non_loopback_without_auth_token_refuses_to_start() {
         initial_ready: false,
         tick_interval: None,
         days_per_tick_speed1: 0.1,
+        ..Default::default()
     };
     let err = RunningMockServer::start(cfg, ScenarioConfig::default())
         .await

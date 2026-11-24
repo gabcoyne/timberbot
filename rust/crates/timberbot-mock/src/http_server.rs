@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use axum::body::Body;
 use axum::extract::{Query, Request, State};
-use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
-use axum::http::{HeaderValue, StatusCode};
+use axum::http::header::{AUTHORIZATION, CONTENT_LENGTH, WWW_AUTHENTICATE};
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -155,6 +156,41 @@ async fn auth_and_ready_gate(
             )
                 .into_response();
         }
+    }
+
+    // 3. Body-size cap matching C# `TimberbotHttpServer.cs` (`maxBodyBytes = 1048576` -> 413)
+    if req.method() == Method::POST {
+        if let Some(cl) = req
+            .headers()
+            .get(CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<usize>().ok())
+        {
+            if cl > state.max_body_bytes {
+                return (
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    Json(json!({
+                        "error": format!("body_too_large: limit is {} bytes", state.max_body_bytes)
+                    })),
+                )
+                    .into_response();
+            }
+        }
+        let (parts, body) = req.into_parts();
+        let bytes = match axum::body::to_bytes(body, state.max_body_bytes).await {
+            Ok(b) => b,
+            Err(_) => {
+                return (
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    Json(json!({
+                        "error": format!("body_too_large: limit is {} bytes", state.max_body_bytes)
+                    })),
+                )
+                    .into_response();
+            }
+        };
+        let rebuilt = Request::from_parts(parts, Body::from(bytes));
+        return next.run(rebuilt).await;
     }
 
     next.run(req).await
@@ -311,7 +347,7 @@ async fn wellbeing(State(s): State<Arc<SharedMockState>>) -> Json<WellbeingRepor
     } else {
         w.beavers
             .iter()
-            .map(|b| b.wellbeing.unwrap_or(0) as f64)
+            .map(|b| b.wellbeing.unwrap_or(0.0))
             .sum::<f64>()
             / w.beavers.len() as f64
     };
@@ -324,13 +360,13 @@ async fn wellbeing(State(s): State<Arc<SharedMockState>>) -> Json<WellbeingRepor
             needs: vec![
                 WellbeingNeed {
                     id: "Thirst".to_string(),
-                    favorable_wellbeing: 1.0,
-                    unfavorable_wellbeing: -4.0,
+                    favorable_wellbeing: 0.0,
+                    unfavorable_wellbeing: -10.0,
                 },
                 WellbeingNeed {
                     id: "Hunger".to_string(),
-                    favorable_wellbeing: 1.0,
-                    unfavorable_wellbeing: -4.0,
+                    favorable_wellbeing: 0.0,
+                    unfavorable_wellbeing: -10.0,
                 },
             ],
         }],
@@ -356,9 +392,13 @@ async fn set_workhours(
         )
             .into_response();
     }
-    let mut w = s.world.lock().expect("lock");
-    w.work_end_hours = req.end_hours;
-    Json(json!({"endHours": req.end_hours})).into_response()
+    let end_hours = req.end_hours;
+    s.run_write_job(move |w| {
+        w.work_end_hours = end_hours;
+        ((), Vec::new())
+    })
+    .await;
+    Json(json!({"endHours": end_hours})).into_response()
 }
 
 async fn speed(State(s): State<Arc<SharedMockState>>) -> Json<SpeedInfo> {
@@ -374,20 +414,24 @@ async fn set_speed(State(s): State<Arc<SharedMockState>>, Json(req): Json<SpeedI
         )
             .into_response();
     }
-    let day = {
-        let mut w = s.world.lock().expect("lock");
-        w.speed = req.speed;
-        w.day_number
-    };
-    s.broadcast_events(vec![ServerFrame::Event(
-        timberbot_protocol::ws::GameEventPayload {
-            event: "speed.changed".to_string(),
-            day,
-            timestamp: 0,
-            data: Some(json!({"speed": req.speed})),
-        },
-    )]);
-    Json(json!({"speed": req.speed})).into_response()
+    let speed = req.speed;
+    s.run_write_job(move |w| {
+        w.speed = speed;
+        let day = w.day_number;
+        (
+            (),
+            vec![ServerFrame::Event(
+                timberbot_protocol::ws::GameEventPayload {
+                    event: "speed.changed".to_string(),
+                    day,
+                    timestamp: 0,
+                    data: Some(json!({"speed": speed})),
+                },
+            )],
+        )
+    })
+    .await;
+    Json(json!({"speed": speed})).into_response()
 }
 
 async fn prefabs(State(s): State<Arc<SharedMockState>>) -> Json<Vec<PrefabInfo>> {
@@ -395,8 +439,9 @@ async fn prefabs(State(s): State<Arc<SharedMockState>>) -> Json<Vec<PrefabInfo>>
     Json(w.prefabs.clone())
 }
 
-async fn power() -> Json<Vec<PowerNetwork>> {
-    Json(Vec::new())
+async fn power(State(s): State<Arc<SharedMockState>>) -> Json<Vec<PowerNetwork>> {
+    let w = s.world.lock().expect("lock");
+    Json(w.power_networks())
 }
 
 async fn tiles(
@@ -579,83 +624,109 @@ async fn pause_building(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<PauseBuildingRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
-        return not_found(req.id);
-    };
-    b.paused = if req.paused { 1 } else { 0 };
-    let name = b.name.clone();
-    w.rebalance_workers_and_housing();
-    Json(json!({"id": req.id, "name": name, "paused": req.paused})).into_response()
+    s.run_write_job(move |w| {
+        let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
+            return (not_found(req.id), Vec::new());
+        };
+        b.paused = if req.paused { 1 } else { 0 };
+        let name = b.name.clone();
+        w.rebalance_workers_and_housing();
+        (
+            Json(json!({"id": req.id, "name": name, "paused": req.paused})).into_response(),
+            Vec::new(),
+        )
+    })
+    .await
 }
 
 async fn set_clutch(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<SetClutchRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
-        return not_found(req.id);
-    };
-    if b.is_clutch != Some(1) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid_type: not a clutch", "id": req.id, "name": b.name})),
+    s.run_write_job(move |w| {
+        let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
+            return (not_found(req.id), Vec::new());
+        };
+        if b.is_clutch != Some(1) {
+            return (
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "invalid_type: not a clutch", "id": req.id, "name": b.name})),
+                )
+                    .into_response(),
+                Vec::new(),
+            );
+        }
+        b.clutch_engaged = Some(if req.engaged { 1 } else { 0 });
+        (
+            Json(json!({"id": req.id, "name": b.name, "engaged": req.engaged})).into_response(),
+            Vec::new(),
         )
-            .into_response();
-    }
-    b.clutch_engaged = Some(if req.engaged { 1 } else { 0 });
-    Json(json!({"id": req.id, "name": b.name, "engaged": req.engaged})).into_response()
+    })
+    .await
 }
 
 async fn set_floodgate(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<SetFloodgateRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
-        return not_found(req.id);
-    };
-    if b.floodgate != Some(1) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "error": "invalid_type: not a floodgate. use buildings name:Floodgate to find floodgates",
-                "id": req.id,
-                "name": b.name
-            })),
+    s.run_write_job(move |w| {
+        let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
+            return (not_found(req.id), Vec::new());
+        };
+        if b.floodgate != Some(1) {
+            return (
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": "invalid_type: not a floodgate. use buildings name:Floodgate to find floodgates",
+                        "id": req.id,
+                        "name": b.name
+                    })),
+                )
+                    .into_response(),
+                Vec::new(),
+            );
+        }
+        let max_h = b.max_height.unwrap_or(1.0);
+        let clamped = req.height.clamp(0.0, max_h);
+        b.height = Some(clamped);
+        (
+            Json(json!({"id": req.id, "name": b.name, "height": clamped, "maxHeight": max_h}))
+                .into_response(),
+            Vec::new(),
         )
-            .into_response();
-    }
-    let max_h = b.max_height.unwrap_or(1.0);
-    let clamped = req.height.clamp(0.0, max_h);
-    b.height = Some(clamped);
-    Json(json!({"id": req.id, "name": b.name, "height": clamped, "maxHeight": max_h}))
-        .into_response()
+    })
+    .await
 }
 
 async fn set_priority(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<SetPriorityRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
-        return not_found(req.id);
-    };
-    match req.priority_type.as_deref().unwrap_or("") {
-        "construction" => b.construction_priority = Some(req.priority),
-        "workplace" => b.workplace_priority = Some(req.priority),
-        _ => {
-            if b.finished == 0 {
-                b.construction_priority = Some(req.priority);
-            } else {
-                b.workplace_priority = Some(req.priority);
+    s.run_write_job(move |w| {
+        let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
+            return (not_found(req.id), Vec::new());
+        };
+        match req.priority_type.as_deref().unwrap_or("") {
+            "construction" => b.construction_priority = Some(req.priority),
+            "workplace" => b.workplace_priority = Some(req.priority),
+            _ => {
+                if b.finished == 0 {
+                    b.construction_priority = Some(req.priority);
+                } else {
+                    b.workplace_priority = Some(req.priority);
+                }
             }
         }
-    }
-    let name = b.name.clone();
-    w.rebalance_workers_and_housing();
-    Json(json!({"id": req.id, "name": name, "priority": req.priority})).into_response()
+        let name = b.name.clone();
+        w.rebalance_workers_and_housing();
+        (
+            Json(json!({"id": req.id, "name": name, "priority": req.priority})).into_response(),
+            Vec::new(),
+        )
+    })
+    .await
 }
 
 async fn set_hauling(
@@ -718,17 +789,24 @@ async fn set_workers(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<SetWorkersRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
-        return not_found(req.id);
-    };
-    let max_w = b.max_workers.unwrap_or(0);
-    let clamped = req.count.min(max_w);
-    b.desired_workers = Some(clamped);
-    let name = b.name.clone();
-    w.rebalance_workers_and_housing();
-    Json(json!({"id": req.id, "name": name, "desiredWorkers": clamped, "maxWorkers": max_w}))
-        .into_response()
+    s.run_write_job(move |w| {
+        let Some(b) = w.buildings.iter_mut().find(|b| b.id == req.id) else {
+            return (not_found(req.id), Vec::new());
+        };
+        let max_w = b.max_workers.unwrap_or(0);
+        let clamped = req.count.min(max_w);
+        b.desired_workers = Some(clamped);
+        let name = b.name.clone();
+        w.rebalance_workers_and_housing();
+        (
+            Json(
+                json!({"id": req.id, "name": name, "desiredWorkers": clamped, "maxWorkers": max_w}),
+            )
+            .into_response(),
+            Vec::new(),
+        )
+    })
+    .await
 }
 
 async fn building_range(
@@ -800,11 +878,14 @@ async fn place_building(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<PlaceBuildingRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    match w.place_building(&req) {
-        Ok(val) => Json(val).into_response(),
-        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({"error": err}))).into_response(),
-    }
+    s.run_write_job(move |w| match w.place_building(&req) {
+        Ok(val) => (Json(val).into_response(), Vec::new()),
+        Err(err) => (
+            (StatusCode::BAD_REQUEST, Json(json!({"error": err}))).into_response(),
+            Vec::new(),
+        ),
+    })
+    .await
 }
 
 async fn find_placement(
@@ -819,60 +900,70 @@ async fn place_path(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<PlacePathRequest>,
 ) -> Json<Value> {
-    let mut w = s.world.lock().expect("lock");
-    let mut placed = 0usize;
-    let mut x = req.x1;
-    let mut y = req.y1;
-    while x != req.x2 || y != req.y2 {
-        if x < req.x2 {
-            x += 1;
-        } else if x > req.x2 {
-            x -= 1;
-        } else if y < req.y2 {
-            y += 1;
-        } else if y > req.y2 {
-            y -= 1;
+    s.run_write_job(move |w| {
+        let mut placed = 0usize;
+        let mut x = req.x1;
+        let mut y = req.y1;
+        while x != req.x2 || y != req.y2 {
+            if x < req.x2 {
+                x += 1;
+            } else if x > req.x2 {
+                x -= 1;
+            } else if y < req.y2 {
+                y += 1;
+            } else if y > req.y2 {
+                y -= 1;
+            }
+            let pr = PlaceBuildingRequest {
+                prefab: "Path".to_string(),
+                x,
+                y,
+                z: 2,
+                orientation: Orientation::South,
+            };
+            if w.place_building(&pr).is_ok() {
+                placed += 1;
+            }
         }
-        let pr = PlaceBuildingRequest {
-            prefab: "Path.Folktails".to_string(),
-            x,
-            y,
-            z: 2,
-            orientation: Orientation::South,
-        };
-        if w.place_building(&pr).is_ok() {
-            placed += 1;
-        }
-    }
-    Json(json!({"placed": placed, "style": req.style}))
+        (
+            Json(json!({"placed": placed, "style": req.style})),
+            Vec::new(),
+        )
+    })
+    .await
 }
 
 async fn plant_crop(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<PlantCropRequest>,
 ) -> Json<Value> {
-    let mut w = s.world.lock().expect("lock");
-    let mut count = 0usize;
-    for y in req.y1.min(req.y2)..=req.y1.max(req.y2) {
-        for x in req.x1.min(req.x2)..=req.x1.max(req.x2) {
-            if !w.crops.iter().any(|c| c.x == x && c.y == y) {
-                let id = w.alloc_id();
-                w.crops.push(Plant {
-                    id,
-                    name: req.crop.clone(),
-                    x,
-                    y,
-                    z: req.z,
-                    alive: 1,
-                    grown: Some(0),
-                    growth: Some(0.0),
-                    marked: Some(0),
-                });
-                count += 1;
+    s.run_write_job(move |w| {
+        let mut count = 0usize;
+        for y in req.y1.min(req.y2)..=req.y1.max(req.y2) {
+            for x in req.x1.min(req.x2)..=req.x1.max(req.x2) {
+                if !w.crops.iter().any(|c| c.x == x && c.y == y) {
+                    let id = w.alloc_id();
+                    w.crops.push(Plant {
+                        id,
+                        name: req.crop.clone(),
+                        x,
+                        y,
+                        z: req.z,
+                        alive: 1,
+                        grown: Some(0),
+                        growth: Some(0.0),
+                        marked: Some(0),
+                    });
+                    count += 1;
+                }
             }
         }
-    }
-    Json(json!({"crop": req.crop, "planted": count}))
+        (
+            Json(json!({"crop": req.crop, "planted": count})),
+            Vec::new(),
+        )
+    })
+    .await
 }
 
 async fn find_planting(
@@ -931,34 +1022,48 @@ async fn unlock_building(
     State(s): State<Arc<SharedMockState>>,
     Json(req): Json<UnlockBuildingRequest>,
 ) -> Response {
-    let mut w = s.world.lock().expect("lock");
-    let Some(idx) = w.unlockables.iter().position(|u| u.name == req.building) else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": format!("not_found: unknown unlockable '{}'", req.building)})),
+    s.run_write_job(move |w| {
+        let Some(idx) = w.unlockables.iter().position(|u| u.name == req.building) else {
+            return (
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": format!("not_found: unknown unlockable '{}'", req.building)})),
+                )
+                    .into_response(),
+                Vec::new(),
+            );
+        };
+        if w.unlockables[idx].unlocked == 1 {
+            return (
+                Json(json!({"building": req.building, "alreadyUnlocked": true})).into_response(),
+                Vec::new(),
+            );
+        }
+        let cost = w.unlockables[idx].cost;
+        if w.science < cost {
+            return (
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": format!("insufficient_science: need {cost}, have {}", w.science)
+                    })),
+                )
+                    .into_response(),
+                Vec::new(),
+            );
+        }
+        w.science -= cost;
+        w.unlockables[idx].unlocked = 1;
+        if let Some(p) = w.prefabs.iter_mut().find(|p| p.name == req.building) {
+            p.unlocked = true;
+        }
+        (
+            Json(json!({"building": req.building, "unlocked": true, "scienceRemaining": w.science}))
+                .into_response(),
+            Vec::new(),
         )
-            .into_response();
-    };
-    if w.unlockables[idx].unlocked == 1 {
-        return Json(json!({"building": req.building, "alreadyUnlocked": true})).into_response();
-    }
-    let cost = w.unlockables[idx].cost;
-    if w.science < cost {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "error": format!("insufficient_science: need {cost}, have {}", w.science)
-            })),
-        )
-            .into_response();
-    }
-    w.science -= cost;
-    w.unlockables[idx].unlocked = 1;
-    if let Some(p) = w.prefabs.iter_mut().find(|p| p.name == req.building) {
-        p.unlocked = true;
-    }
-    Json(json!({"building": req.building, "unlocked": true, "scienceRemaining": w.science}))
-        .into_response()
+    })
+    .await
 }
 
 async fn automation_link(

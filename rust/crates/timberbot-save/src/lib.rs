@@ -25,12 +25,23 @@ pub enum SaveError {
 
 pub type Result<T> = std::result::Result<T, SaveError>;
 
-/// Read-only inspection of a Timberborn `.timber` ZIP save archive.
-/// Never writes or modifies the save file.
+/// Read-only inspection of a Timberborn `.timber` ZIP save or map archive.
+/// Never writes or modifies the archive.
 pub fn inspect_save(path: impl AsRef<Path>) -> Result<SaveReport> {
     let path_ref = path.as_ref();
     let file = File::open(path_ref)?;
     let mut archive = ZipArchive::new(file)?;
+
+    let version_txt = archive.by_name("version.txt").ok().and_then(|mut entry| {
+        let mut s = String::new();
+        entry.read_to_string(&mut s).ok()?;
+        let trimmed = s.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
 
     let mut world_entry = archive
         .by_name("world.json")
@@ -39,7 +50,11 @@ pub fn inspect_save(path: impl AsRef<Path>) -> Result<SaveReport> {
     world_entry.read_to_string(&mut contents)?;
 
     let root: Value = serde_json::from_str(&contents)?;
-    Ok(analyze_world_json(&path_ref.display().to_string(), &root))
+    let mut report = analyze_world_json(&path_ref.display().to_string(), &root);
+    if report.game_version.is_none() {
+        report.game_version = version_txt;
+    }
+    Ok(report)
 }
 
 /// Analyze a parsed `world.json` document (also usable in unit tests without disk I/O).
@@ -106,7 +121,7 @@ pub fn analyze_world_json(path_label: &str, root: &Value) -> SaveReport {
         })
         .and_then(Value::as_bool);
 
-    let terrain_stats = extract_terrain_stats(singletons);
+    let terrain_stats = extract_terrain_stats(singletons, map_size.as_ref());
 
     let mut template_counts = BTreeMap::new();
     let mut stock_totals = BTreeMap::new();
@@ -120,7 +135,8 @@ pub fn analyze_world_json(path_label: &str, root: &Value) -> SaveReport {
             }
             if let Some(comps) = ent.get("Components").and_then(Value::as_object) {
                 for (comp_name, comp_val) in comps {
-                    if comp_name.contains("Inventory") {
+                    if comp_name.contains("Inventory") && comp_name != "Inventory:ConstructionSite"
+                    {
                         accumulate_inventory(comp_val, &mut stock_totals);
                     }
                 }
@@ -147,18 +163,48 @@ pub fn analyze_world_json(path_label: &str, root: &Value) -> SaveReport {
     }
 }
 
-fn extract_terrain_stats(singletons: Option<&Value>) -> Option<TerrainStats> {
+fn extract_terrain_stats(
+    singletons: Option<&Value>,
+    map_size: Option<&SaveMapSize>,
+) -> Option<TerrainStats> {
     let singletons = singletons?;
-    let heights_str = singletons
-        .get("TerrainMap")
-        .and_then(|t| t.get("Heights"))
-        .and_then(|h| h.get("Array"))
-        .and_then(Value::as_str)?;
+    let terrain = singletons.get("TerrainMap")?;
 
-    let heights: Vec<i32> = heights_str
-        .split_whitespace()
-        .filter_map(|tok| tok.parse::<i32>().ok())
-        .collect();
+    let heights: Vec<i32> = if let Some(heights_str) = terrain
+        .get("Heights")
+        .and_then(|h| h.get("Array"))
+        .and_then(Value::as_str)
+    {
+        heights_str
+            .split_whitespace()
+            .filter_map(|tok| tok.parse::<i32>().ok())
+            .collect()
+    } else {
+        let voxels_str = terrain
+            .get("Voxels")
+            .and_then(|v| v.get("Array"))
+            .and_then(Value::as_str)?;
+        // Timberborn 1.0/1.1 stores TerrainMap.Voxels.Array as 23 vertical layers
+        // indexed `z * X * Y + y * X + x` with 0/1 solid voxels (verified via
+        // 0xguy07/timberborn-tools on 1.0.13.1 & 1.1.2.4).
+        let (x, y) = map_size.map(|m| (m.x as usize, m.y as usize))?;
+        let layer_size = x.saturating_mul(y);
+        if layer_size == 0 {
+            return None;
+        }
+        let mut col_heights = vec![0i32; layer_size];
+        for (idx, tok) in voxels_str.split_whitespace().enumerate() {
+            if tok == "1" {
+                let z = (idx / layer_size) as i32;
+                let cell = idx % layer_size;
+                if z + 1 > col_heights[cell] {
+                    col_heights[cell] = z + 1;
+                }
+            }
+        }
+        col_heights
+    };
+
     if heights.is_empty() {
         return None;
     }
@@ -166,33 +212,7 @@ fn extract_terrain_stats(singletons: Option<&Value>) -> Option<TerrainStats> {
     let min_height = *heights.iter().min().unwrap_or(&0);
     let max_height = *heights.iter().max().unwrap_or(&0);
 
-    let wet_tiles = singletons
-        .get("WaterMap")
-        .or_else(|| singletons.get("WaterMapNew"))
-        .and_then(|w| w.get("WaterDepths").or_else(|| w.get("WaterColumns")))
-        .and_then(|d| d.get("Array"))
-        .and_then(Value::as_str)
-        .map(|s| {
-            s.split_whitespace()
-                .filter_map(|tok| tok.parse::<f64>().ok())
-                .filter(|&v| v > 0.01)
-                .count()
-        })
-        .unwrap_or(0);
-
-    let contaminated_tiles = singletons
-        .get("WaterMap")
-        .or_else(|| singletons.get("WaterMapNew"))
-        .and_then(|w| w.get("Contaminations").or_else(|| w.get("Outflows")))
-        .and_then(|d| d.get("Array"))
-        .and_then(Value::as_str)
-        .map(|s| {
-            s.split_whitespace()
-                .filter_map(|tok| tok.parse::<f64>().ok())
-                .filter(|&v| v > 0.01)
-                .count()
-        })
-        .unwrap_or(0);
+    let (wet_tiles, contaminated_tiles) = extract_water_counts(singletons);
 
     Some(TerrainStats {
         tile_count: heights.len(),
@@ -201,6 +221,90 @@ fn extract_terrain_stats(singletons: Option<&Value>) -> Option<TerrainStats> {
         wet_tiles,
         contaminated_tiles,
     })
+}
+
+fn extract_water_counts(singletons: &Value) -> (usize, usize) {
+    let mut wet = 0usize;
+    let mut contaminated = 0usize;
+
+    if let Some(cols_str) = singletons
+        .get("WaterMapNew")
+        .and_then(|w| w.get("WaterColumns"))
+        .and_then(|d| d.get("Array"))
+        .and_then(Value::as_str)
+    {
+        let mut saw_colon_format = false;
+        for tok in cols_str.split_whitespace() {
+            if tok == "0" {
+                continue;
+            }
+            if tok.contains(':') {
+                saw_colon_format = true;
+                // 1.0/1.1 column format: "depth:contamination:?:floorZ:prev"
+                let mut parts = tok.split(':');
+                let depth = parts
+                    .next()
+                    .and_then(|p| p.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                let contam = parts
+                    .next()
+                    .and_then(|p| p.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                if depth > 0.01 {
+                    wet += 1;
+                }
+                if contam > 0.01 {
+                    contaminated += 1;
+                }
+            } else if let Ok(depth) = tok.parse::<f64>() {
+                if depth > 0.01 {
+                    wet += 1;
+                }
+            }
+        }
+        if !saw_colon_format {
+            contaminated = singletons
+                .get("WaterMapNew")
+                .and_then(|w| w.get("Contamination").or_else(|| w.get("Contaminations")))
+                .and_then(|d| d.get("Array"))
+                .and_then(Value::as_str)
+                .map(|s| {
+                    s.split_whitespace()
+                        .filter_map(|tok| tok.parse::<f64>().ok())
+                        .filter(|&v| v > 0.01)
+                        .count()
+                })
+                .unwrap_or(0);
+        }
+        return (wet, contaminated);
+    }
+
+    if let Some(wm) = singletons.get("WaterMap") {
+        wet = wm
+            .get("WaterDepths")
+            .and_then(|d| d.get("Array"))
+            .and_then(Value::as_str)
+            .map(|s| {
+                s.split_whitespace()
+                    .filter_map(|tok| tok.parse::<f64>().ok())
+                    .filter(|&v| v > 0.01)
+                    .count()
+            })
+            .unwrap_or(0);
+        contaminated = wm
+            .get("Contaminations")
+            .and_then(|d| d.get("Array"))
+            .and_then(Value::as_str)
+            .map(|s| {
+                s.split_whitespace()
+                    .filter_map(|tok| tok.parse::<f64>().ok())
+                    .filter(|&v| v > 0.01)
+                    .count()
+            })
+            .unwrap_or(0);
+    }
+
+    (wet, contaminated)
 }
 
 fn accumulate_inventory(comp: &Value, totals: &mut BTreeMap<String, i64>) {
@@ -228,6 +332,8 @@ fn accumulate_inventory(comp: &Value, totals: &mut BTreeMap<String, i64>) {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
     use serde_json::json;
 
@@ -277,5 +383,65 @@ mod tests {
         assert_eq!(ts.tile_count, 4);
         assert_eq!(ts.wet_tiles, 2);
         assert_eq!(ts.contaminated_tiles, 1);
+    }
+
+    #[test]
+    fn analyzes_timberborn_1_1_voxels_and_colon_water_columns() {
+        // 2x2 map with 3 layers (z=0 all solid, z=1 cells 0,1 solid, z=2 cell 0 solid -> heights [3,2,1,1])
+        let doc = json!({
+            "GameVersion": "1.1.2.4",
+            "Timestamp": "2026-10-15 09:30:00",
+            "Singletons": {
+                "MapSize": { "Size": { "X": 2, "Y": 2 } },
+                "DayNightCycle": { "DayNumber": 48 },
+                "GameCycleService": { "Cycle": 4, "CycleDay": 15 },
+                "WeatherService": { "IsHazardousWeather": true },
+                "TerrainMap": { "Voxels": { "Array": "1 1 1 1 1 1 0 0 1 0 0 0" } },
+                "WaterMapNew": {
+                    "Levels": 1,
+                    "WaterColumns": { "Array": "0 1.4:0.0:0:2:0 1.1:0.75:0:1:0 0" }
+                }
+            },
+            "Entities": [
+                {
+                    "Template": "SmallTank.Folktails",
+                    "Components": {
+                        "Inventory:Good": {
+                            "Storage": { "Goods": [{ "Good": "Water", "Amount": 30 }] }
+                        },
+                        "Inventory:ConstructionSite": {
+                            "Storage": { "Goods": [{ "Good": "Log", "Amount": 15 }] }
+                        }
+                    }
+                }
+            ]
+        });
+
+        let report = analyze_world_json("real_1_1_2_4.timber", &doc);
+        assert_eq!(report.game_version.as_deref(), Some("1.1.2.4"));
+        let ts = report.terrain_stats.expect("voxel terrain stats");
+        assert_eq!(ts.tile_count, 4);
+        assert_eq!(ts.min_height, 1);
+        assert_eq!(ts.max_height, 3);
+        assert_eq!(ts.wet_tiles, 2);
+        assert_eq!(ts.contaminated_tiles, 1);
+        assert_eq!(report.stock_totals.get("Water"), Some(&30));
+        // Inventory:ConstructionSite is excluded from available colony stock
+        assert_eq!(report.stock_totals.get("Log"), None);
+    }
+
+    #[test]
+    fn inspects_real_practice_valley_timber_archive() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../scenarios/practice-valley.timber");
+        let report = inspect_save(&path).expect("inspect practice-valley.timber");
+        assert_eq!(report.game_version.as_deref(), Some("1.0.13.1-b769e88-sm"));
+        assert_eq!(report.map_size, Some(SaveMapSize { x: 128, y: 128 }));
+        assert_eq!(report.entity_count, 1644);
+        assert_eq!(report.template_counts.get("WaterSource"), Some(&20));
+        assert_eq!(report.template_counts.get("Pine"), Some(&520));
+        let ts = report.terrain_stats.expect("voxel terrain stats");
+        assert_eq!(ts.tile_count, 128 * 128);
+        assert!(ts.max_height > ts.min_height);
     }
 }
