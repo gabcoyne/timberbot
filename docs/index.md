@@ -43,6 +43,14 @@ Timberbot gives Claude, Codex, ChatGPT, or your own scripts complete access to a
 
     Internals, thread model, read/write pipeline.
 
+- **[Game build pin](game-build.md)**
+
+    The only build this repo pins is manifest minimum 1.1.2.0. Latest Steam compatibility is unverified.
+
+- **[Remote access](remote-access.md)**
+
+    SSH tunnel first. Token-protected non-loopback bind stays opt-in.
+
 </div>
 
 ---

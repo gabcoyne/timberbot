@@ -388,6 +388,8 @@ The `(host=… port=… auth=…)` tag tells you *where each setting came from* 
 
 ## Remote connections
 
+Prefer an SSH tunnel that leaves the mod on `127.0.0.1` with an empty `authToken`. That path, and the existing token-protected non-loopback bind, are written up in [Remote access](remote-access.md). The bind stays opt-in: the committed `settings.json` listens on loopback only, and the mod refuses to start if `listenAddress` is non-loopback while `authToken` is empty.
+
 By default the Python client connects to `127.0.0.1:8085`. Several ways to override:
 
 ```bash
