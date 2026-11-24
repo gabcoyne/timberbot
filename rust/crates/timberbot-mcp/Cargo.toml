@@ -20,4 +20,5 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
+timberbot-agent.workspace = true
 timberbot-mock.workspace = true

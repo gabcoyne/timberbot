@@ -1465,6 +1465,7 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
+ "timberbot-agent",
  "timberbot-client",
  "timberbot-mock",
  "timberbot-protocol",
