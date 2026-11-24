@@ -67,8 +67,10 @@ async fn fresh_start_bootstraps_farmhouse_crops_and_housing() {
         .unwrap()
         .items;
     assert!(
-        buildings.iter().any(|b| b.name.contains("Farmhouse")),
-        "fresh-start should place a Farmhouse"
+        buildings
+            .iter()
+            .any(|b| b.name.to_ascii_lowercase().contains("farmhouse")),
+        "fresh-start should place a FarmHouse"
     );
     assert!(
         buildings.iter().any(|b| b.name.contains("Lodge")),
@@ -77,7 +79,8 @@ async fn fresh_start_bootstraps_farmhouse_crops_and_housing() {
 
     let summary = client.summary().await.unwrap();
     let pop = summary.districts[0].population.total_beavers();
-    assert_eq!(pop, 11, "all starting beavers should survive");
+    assert_eq!(server.state.world.lock().unwrap().metrics.deaths, 0);
+    assert!(pop >= 11, "all starting beavers should survive (got {pop})");
     assert!(
         summary
             .crops

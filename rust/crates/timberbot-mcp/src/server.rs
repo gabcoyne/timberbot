@@ -92,6 +92,7 @@ impl McpServer {
             tool_def("timberbot_alerts", "List active colony alerts (unstaffed, unpowered, unreachable, status).", json!({"type": "object", "properties": {}})),
             tool_def("timberbot_science", "List science points and unlockable buildings.", json!({"type": "object", "properties": {}})),
             tool_def("timberbot_prefabs", "List buildable prefabs with footprints, science cost, and material costs.", json!({"type": "object", "properties": {}})),
+            tool_def("timberbot_workhours", "Get current work end hours and whether it is currently working hours.", json!({"type": "object", "properties": {}})),
             // --- Timberbot mod (:8085) write tools ---
             tool_def("timberbot_set_speed", "Set game speed (0=pause, 1=normal, 2=fast, 3=fastest).", json!({
                 "type": "object",
@@ -382,6 +383,7 @@ impl McpServer {
                     .ok_or("missing speed")? as u8;
                 to_val(self.mod_client.set_speed(speed).await)
             }
+            "timberbot_workhours" => to_val(self.mod_client.workhours().await),
             "timberbot_set_workhours" => {
                 let end_hours = args
                     .get("endHours")
