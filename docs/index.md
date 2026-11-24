@@ -51,6 +51,10 @@ Timberbot gives Claude, Codex, ChatGPT, or your own scripts complete access to a
 
     SSH tunnel first. Token-protected non-loopback bind stays opt-in.
 
+- **[Mock fidelity](mock-fidelity.md)**
+
+    Source-cited verification matrix for every Timberborn 1.1 mechanic and API shape in the offline mock.
+
 </div>
 
 ---

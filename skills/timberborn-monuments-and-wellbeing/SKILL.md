@@ -17,9 +17,9 @@ Wellbeing is the sum of satisfied need bonuses minus penalties. It unlocks tiere
 | 70–71 | **+260%** | movement +70%, life expectancy +120% |
 Kits grow faster too. A colony at single-digit wellbeing wastes most of its labour. A real 600-day colony topped out at 14, and 92–94% of adults were *out of range* of the monuments it had built [0xguy07]. **Coverage beats ownership.**
 
-## Need categories (pre-1.1 max ~77 per faction. 1.1 adds buildings, so read `/api/wellbeing`)
-- **Folktails**: Basic 5 · Social 11 · Fun 8 · Nutrition 15 · Aesthetics 9 · Knowledge 3 · Awe 26
-- **Iron Teeth**: Basic 5 · Social 2 · Fun 17 · Nutrition 17 · Aesthetics 10 · Awe 26
+## Need categories (pre-1.1-attractions Folktails max **78** verified from `python/tests/fixtures/openapi/wellbeing.json`; 1.1 adds attractions & Tier 4 monuments whose points are unverified — read `/api/wellbeing`)
+- **Folktails (recorded fixture)**: BasicNeeds 5 · Nutrition 16 (incl. Berries +1) · SocialLife 11 · Fun 11 (incl. Books +3) · Aesthetics 9 · Awe 26 = **78**
+- **Iron Teeth**: Basic 5 · Social 2 · Fun 17 · Nutrition 17 · Aesthetics 10 · Awe 26 (wiki pre-1.1)
 Penalties: Hunger or Thirst unmet −10 each, Contaminated −10, Shelter unmet −3, Injury −2, chipped teeth or bee sting −1, Sleep unmet −1.
 1.1 change: wellbeing from Contemplation Spot, Lido, Scratcher, Swimming Pool, Rooftop Terrace, and especially Campfire now decays more slowly.
 
@@ -36,13 +36,13 @@ Penalties: Hunger or Thirst unmet −10 each, Contaminated −10, Shelter unmet 
 | 2 | Brazier of Bonding | Flame of Unity (300 plank, 100 metal parts) | 3,000 | +5 | ~10 |
 | 3 | Fountain of Joy | Tribute to Ingenuity | 12,000 | +8 | ~20 |
 | 4 (1.1) | Hall of Abundance (700 plank, 300 treated plank, 500 metal block) | Arch of Progress (600 plank, 300 treated plank, 600 metal block) | 15,000 | +8? (search snippet. **Unverified**, may be higher) | ~30 (unverified) |
-| Wonder | Earth Recultivator (2,000 gear, 1,500 metal block, 2,000 treated plank; 10 workers) | Earth Repopulator (1,500 gear, 2,000 metal block, 2,000 treated plank; 8 workers) | 20,000 | +10 | map-wide? (unverified) |
+| Wonder | Earth Recultivator (2,000 gear, 1,500 metal block, 2,000 treated plank; 10 workers) | Earth Repopulator (1,500 gear, 2,000 metal block, 2,000 treated plank; 8 workers) | 20,000 | +10 | **40 tiles** ([wiki Wonders](https://timberborn.wiki.gg/wiki/Wonders)) |
 Place monuments at the centre of the housing cluster, and check coverage by counting homes inside the range.
 
 ## Wonder and map completion
-- Wonders are built in 5 visible stages. They must be **activated (launched)** for an extra cost to complete the map.
-  - Earth Recultivator launch: ~500 Extract + 500 Paper (wiki via search, unverified).
-  - Earth Repopulator launch: ~500 Berries + 500 Treated Planks, plus up to 8 beaver pilots (unverified).
+- Wonders are built in **4** visible stages (25% each, [wiki Wonders](https://timberborn.wiki.gg/wiki/Wonders)). They must be **activated (launched)** for an extra cost to complete the map:
+  - Earth Recultivator launch: **500 Paper + 500 Extract** ([wiki Earth Recultivator](https://timberborn.wiki.gg/wiki/Earth_Recultivator)).
+  - Earth Repopulator launch: **500 Berries + 500 Treated Planks + up to 8 pilots** ([wiki Earth Repopulator](https://timberborn.wiki.gg/wiki/Earth_Repopulator)).
 - The first launch shows a stats pop-up, adds a faction badge to the map, and unlocks **Flexible Start** on that map for both factions. You can keep playing after.
 - WS events: `wonder.activated`, `wonder.countdown`, `wonder.completed`.
 - Launching is a milestone the human may want to watch. **Ask before launching.**
