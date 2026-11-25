@@ -39,7 +39,7 @@ Folktails ("Comfort, food, and sturdy wood") are the starter faction and the one
 Nutrition wellbeing comes from **variety**. Each distinct food adds its own bonus.
 
 ## Bots
-Bot Part Factory (500 SP) plus Bot Assembler (750 SP, 250 hp). Folktails chassis need Biofuel from the Refinery (400 SP): 2 water + 2 potatoes → 30 biofuel per 3 h is the efficient recipe. Bots use roughly 2 biofuel a day each [Timberbot guide, unverified]. Catalyst (maple syrup + extract) and Punch Cards (Printing Press) boost them. Bots can't work Power Wheels or Inventors.
+Bot Part Factory (500 SP) plus Bot Assembler (750 SP, 250 hp). Folktails chassis need Biofuel from the Refinery (400 SP): 2 water + 2 potatoes → 30 biofuel per 3 h is the efficient recipe. Bots consume **1.93 biofuel/day** (decay 58/day, +30 per unit, [wiki Needs](https://timberborn.wiki.gg/wiki/Needs)). Catalyst (maple syrup + extract) and Punch Cards (Printing Press) boost them (0.67/day each). Bots can't work Power Wheels or Inventors.
 
 ## Wellbeing ceiling (pre-1.1 table: max 77) [Timberbot guide]
 BasicNeeds 5 (Hunger, Thirst, Sleep, Shelter, WetFur via Shower) · Social 11 (Campfire 1, Contemplation Spot 1, Rooftop Terrace 1, Agora 3, Dance Hall 5) · Fun 8 (Detailer 1, Lido 1, Carousel 3, Mud Pit 3) · Nutrition 15 · Aesthetics 9 · Knowledge 3 (Books) · Awe 26 (Farmer Monument 3, Brazier of Bonding 5, Fountain of Joy 8, Earth Recultivator 10).

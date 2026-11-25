@@ -26,7 +26,7 @@ Timberborn (Mechanistry) is a city builder about beavers in a post-human wastela
 | Small / Medium / Large Tank | 30 / 300 / 1200 water | same |
 | Temperate length (Easy/Normal/Hard) | 16–19 / 13–17 / 5–8 days | wiki Game Mode, via search. Verify in game |
 | Drought length (Easy/Normal/Hard) | 2–4 / 5–9 / 15–30 days, ramping up over the first ~6 cycles (handicap) | same |
-| Badtides | Normal: 40% chance after 4 badtide-free cycles. Hard: 40% after 3 | same, unverified |
+| Badtides | Easy: 1–3 d (40% after 5 cycles). Normal: 4–8 d (40% after 4 cycles). Hard: 15–30 d (40% after 3 cycles) | [wiki Game Mode](https://timberborn.wiki.gg/wiki/Game_Mode) |
 | Kits, adults, bots | kits eat and drink. Bots eat and drink nothing | wiki |
 
 Kits and adults both consume. Working hours do **not** change consumption, but shorter shifts cut pump and farm output.

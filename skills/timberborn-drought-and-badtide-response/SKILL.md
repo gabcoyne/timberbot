@@ -5,14 +5,14 @@ description: "Use when a drought or badtide is approaching, active, or just ende
 
 # Drought and badtide response
 
-Every cycle is one temperate season followed by one hazardous season, either a **drought** or a **badtide**. Hazard length grows over the first cycles through the difficulty "handicap", which starts at a percentage of max severity and climbs to 100% (Normal default: drought handicap 38% over 6 cycles) [wiki Game Mode via search, verify]. The best forecast is the game's own recent history, which you can get from saves (`overview`) or `GET /api/weather`.
+Every cycle is one temperate season followed by one hazardous season, either a **drought** or a **badtide**. Hazard length grows over the first cycles through the difficulty "handicap", which starts at a percentage of max severity and climbs to 100% (Normal default: drought handicap 38% over 5 cycles; badtide handicap 15% over 5 cycles) [wiki Game Mode]. The best forecast is the game's own recent history, which you can get from saves (`overview`) or `GET /api/weather`.
 
 | Difficulty | Temperate | Drought | Badtide |
 |---|---|---|---|
-| Easy | 16–19 d | 2–4 d | (unverified) |
-| Normal | 13–17 d | 5–9 d | 40% chance per cycle after 4 badtide-free cycles |
-| Hard | 5–8 d | 15–30 d | 40% after 3 cycles |
-(All wiki-sourced via search. Confirm on the New Game screen or the wiki.)
+| Easy | 16–19 d | 2–4 d (handicap 25% for 8 cycles) | 1–3 d (40% after 5 cycles; handicap 30% for 6 cycles) |
+| Normal | 13–17 d | 5–9 d (handicap 38% for 5 cycles) | 4–8 d (40% after 4 cycles; handicap 15% for 5 cycles) |
+| Hard | 5–8 d | 15–30 d (handicap 20% for 12 cycles) | 15–30 d (40% after 3 cycles; handicap 40% for 9 cycles) |
+(Verified from https://timberborn.wiki.gg/wiki/Game_Mode; starting adults 9 / children 4, consumption 40% / 100% / 100%.)
 
 ## Detecting it
 - WS events: `weather.selected` (the next hazard type is chosen), `drought.approaching` (the UI warning), `drought.start` and `drought.end` (fired for both drought and badtide), `cycle.start`.

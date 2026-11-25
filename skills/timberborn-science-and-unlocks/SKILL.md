@@ -8,7 +8,7 @@ description: "Use when deciding what to research next in Timberborn, how to rais
 ## Income
 - **Inventor** (12 logs, 0 SP, 1 worker): 1 SP per hour of work, so ~16 SP a day on a 16 h shift. Beavers only (bots can't work it). Build 1 by day ~3, then 2–4 in the first cycles. Cheap and always worth it until the Observatory.
 - **Observatory** (FT, 1000 SP, 80 plank, 30 gear, 10 pine resin, 4 workers, 200 hp): 10 SP per cycle, so **12 SP an hour** since 1.1.
-- **Numbercruncher** (IT, 30 plank, 100 gear, 50 metal parts): Iron Teeth's late science building. Output and unlock cost are unverified (one guide says 1,500 SP and ~500 hp).
+- **Numbercruncher** (IT, 30 plank, 100 gear, 50 metal parts): Iron Teeth's late science building. Power demand is **400 hp** ([wiki Power](https://timberborn.wiki.gg/wiki/Power)); exact unlock SP and science/hr output remain unverified.
 - **Relics** (small, medium, large) on some maps grant free SP when collected.
 - Wellbeing raises work speed, and science scales with it.
 - HTTP Lever and Adapter unlocks (5000 and 7500 SP) are **global**: you pay once for all future settlements.

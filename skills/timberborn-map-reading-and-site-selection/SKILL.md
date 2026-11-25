@@ -7,7 +7,7 @@ description: "Use when choosing a Timberborn map, difficulty or start location, 
 
 ## Choosing map and difficulty (for a bot learning the game)
 - Start on **Normal** on a beginner-friendly map (revised **Waterfalls**, Plains, or a community "Practice Valley" from 0xguy07/timberborn-tools). Move to Hard only after the agent survives 10+ cycles without deaths.
-- **Easy** = 40% consumption, 16–19 day temperate, 2–4 day droughts. **Normal** = 13–17 / 5–9. **Hard** = 5–8 / 15–30 (wiki-sourced, verify). **Custom** sets starting adults and kits, food and water, consumption, temperate, drought, and badtide ranges, badtide chance, badtide-free cycles, and the handicap % and cycles.
+- **Easy** = 40% consumption, 16–19 day temperate, 2–4 day droughts, 1–3 day badtides. **Normal** = 13–17 / 5–9 / 4–8. **Hard** = 5–8 / 15–30 / 15–30 ([wiki Game Mode](https://timberborn.wiki.gg/wiki/Game_Mode)). **Custom** sets starting adults and kits, food and water, consumption, temperate, drought, and badtide ranges, badtide chance, badtide-free cycles, and the handicap % and cycles.
 - Unconventional maps (1.0/1.1): **Oasis** (aquifers, standing water), **Pressure** (underground sources, Unstable Cores), **Spillage** (irrigated enclaves, hazards), **Beaverome**, **Diorama**, **Nomads** (256×256, 1.1, water flow moves between cycles), **Pillars** (192×192, 1.1, fractured upper level over a hostile lower level). Save these for a later curriculum.
 - Completing a map with a launched Wonder unlocks **Flexible Start** for that map, so you can choose a start location.
 
