@@ -1,0 +1,19 @@
+[package]
+name = "timberbot-agent"
+description = "Reference pause-observe-plan-act-verify-unpause Timberborn agent loop with deterministic water, food, logs, and housing managers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+timberbot-client.workspace = true
+timberbot-protocol.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

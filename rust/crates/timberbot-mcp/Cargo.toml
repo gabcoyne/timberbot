@@ -1,0 +1,20 @@
+[package]
+name = "timberbot-mcp"
+description = "Standalone stdio MCP server wrapping Timberbot mod HTTP/WS, official localhost:8080 HTTP Levers/Adapters, and .timber save inspection"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+timberbot-client.workspace = true
+timberbot-protocol.workspace = true
+timberbot-save.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

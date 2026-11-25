@@ -1,0 +1,20 @@
+[package]
+name = "timberbot-client"
+description = "Async HTTP + WebSocket client for the Timberbot mod (:8085/:8086) and official Timberborn HTTP Lever/Adapter API (:8080)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures-util.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+timberbot-protocol.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+tracing.workspace = true
+urlencoding.workspace = true
