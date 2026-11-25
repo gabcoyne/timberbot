@@ -18,7 +18,7 @@ Each role is a separate worker. One worker does not implement, review, and sign 
 
 - Reviewer has approved.
 - QA reports tests, evals, drills, skill lint, and CI green.
-- A C# change names the release rebuild.
+- A diff that touches `timberbot/` names the `timberbot-mod-<version>.zip` rebuild (`scripts/package-mod.ps1` or `scripts/package-mod.sh`).
 - The pull request targets `main` and does not stack on an unmerged branch.
 
 ## Issue watch

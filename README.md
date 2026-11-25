@@ -109,7 +109,7 @@ cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- report --traces
 - **[Getting Started](docs/getting-started.md)** & **[Python `tbot` CLI / API Reference](docs/api-reference.md)** — Python client (`pipx install timberbot`), HTTP endpoints, and [WebSocket Protocol](docs/websocket-protocol.md).
 - **[Skills Library](skills/README.md)** — 20 Timberborn 1.1 playbooks and source audit ([`skills/SOURCES.md`](skills/SOURCES.md)).
 - **[Repo Guide](AGENTS.md)** & **[Developing](docs/developing.md)** — Project layout, C# mod conventions, and release workflow.
-- **[SDLC](docs/sdlc.md)** — Separate triage, builder, reviewer, and QA. Small pull requests onto `main`, `Closes #<issue>`, and a regression test or drill before merge.
+- **[SDLC](docs/sdlc.md)** — Separate triage, builder, reviewer, and QA. Small pull requests onto `main`, `Closes #<issue>`, and a regression test, offline eval, or staged-drill case before merge.
 
 ## Requirements & Credits
 
