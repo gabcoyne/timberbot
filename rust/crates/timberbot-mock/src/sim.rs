@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -535,10 +535,16 @@ pub struct MockWorld {
 
     pub reservoir_water_depth: f64,
     pub river_contamination: f64,
-    /// 1D segmented river depth along y = 0..map_size.y (upstream y=0 -> downstream).
+    /// Row-summary river depth along y = 0..32 (synced from center channel x=10 of `water_grid`).
     pub river_depth: Vec<f64>,
-    /// 1D segmented river badwater contamination (0.0..=1.0) along y = 0..map_size.y.
+    /// Row-summary river contamination along y = 0..32 (synced from center channel x=10 of `contam_grid`).
     pub river_contam: Vec<f64>,
+    /// 2D 32x32 water depth grid (`idx = y * 32 + x`).
+    pub water_grid: Vec<f64>,
+    /// 2D 32x32 badwater contamination grid (`idx = y * 32 + x`).
+    pub contam_grid: Vec<f64>,
+    /// 2D 32x32 soil moisture/irrigation grid (`idx = y * 32 + x`).
+    pub moist_grid: Vec<bool>,
 
     pub science: u32,
     pub science_accum: f64,
@@ -720,6 +726,25 @@ impl MockWorld {
             river_contamination: cfg.river_contamination,
             river_depth: vec![cfg.reservoir_water_depth; 32],
             river_contam: vec![cfg.river_contamination; 32],
+            water_grid: {
+                let mut g = vec![0.0_f64; 32 * 32];
+                for y in 0..32 {
+                    for x in 9..=11 {
+                        g[y * 32 + x] = cfg.reservoir_water_depth;
+                    }
+                }
+                g
+            },
+            contam_grid: {
+                let mut g = vec![0.0_f64; 32 * 32];
+                for y in 0..32 {
+                    for x in 9..=11 {
+                        g[y * 32 + x] = cfg.river_contamination;
+                    }
+                }
+                g
+            },
+            moist_grid: vec![false; 32 * 32],
             science: cfg.science,
             science_accum: 0.0,
             resources,
@@ -759,7 +784,10 @@ impl MockWorld {
             was_contaminated: false,
             breeding_accum: 0.0,
         };
+        world.recompute_moist_grid();
+        world.update_reachability();
         world.rebalance_workers_and_housing();
+        world.update_power_grid();
         world
     }
 
@@ -970,103 +998,8 @@ impl MockWorld {
             }
         }
 
-        // Update 1D river channel (y = 0..map_size.y) with tile-by-tile propagation lag,
-        // floodgate badwater blocking at fg.y, and verified Dam/Floodgate evaporation rates.
-        let river_len = self.river_depth.len().max(1);
-        let intake_y = 14usize.min(river_len - 1);
-        let max_gate_height = self
-            .buildings
-            .iter()
-            .filter(|b| b.finished == 1 && b.floodgate == Some(1))
-            .filter_map(|b| b.height)
-            .fold(0.0_f64, f64::max);
-        let blocking_gate_y = self
-            .buildings
-            .iter()
-            .filter(|b| b.finished == 1 && b.floodgate == Some(1) && b.height.unwrap_or(0.0) >= 0.8)
-            .map(|b| b.y.clamp(0, (river_len - 1) as i32) as usize)
-            .min();
-        let has_dam = self
-            .buildings
-            .iter()
-            .any(|b| b.finished == 1 && b.name.starts_with("Dam."));
-
-        // Advect river waves in 1-tile steps (`1 / WATER_PROPAGATION_TILES_PER_DAY` days per tile)
-        // so upstream tiles feel drought/badtide/recovery earlier than downstream tiles.
-        let step_dt = 1.0 / WATER_PROPAGATION_TILES_PER_DAY;
-        let mut remaining_dt = dt;
-        while remaining_dt > 1e-9 {
-            let sub_dt = remaining_dt.min(step_dt);
-            let frac = (sub_dt / step_dt).clamp(0.0, 1.0);
-            remaining_dt -= sub_dt;
-
-            if self.is_hazardous {
-                match self.hazard_kind {
-                    HazardKind::Drought => {
-                        let evap = if max_gate_height >= DAM_SPILL_HEIGHT || has_dam {
-                            EVAP_WIDE_POOL_PER_DAY
-                        } else if max_gate_height > 0.0 {
-                            EVAP_MEDIUM_CHANNEL_PER_DAY
-                        } else {
-                            EVAP_NARROW_CHANNEL_PER_DAY
-                        };
-                        for y in 0..river_len {
-                            self.river_contam[y] = (self.river_contam[y] - 0.5 * sub_dt).max(0.0);
-                            self.river_depth[y] = (self.river_depth[y] - evap * sub_dt).max(0.0);
-                        }
-                    }
-                    HazardKind::Badtide => {
-                        let prev_c = self.river_contam.clone();
-                        let prev_d = self.river_depth.clone();
-                        // Upstream source y=0 emits badwater immediately
-                        self.river_contam[0] = prev_c[0] + (0.95 - prev_c[0]) * frac;
-                        self.river_depth[0] = prev_d[0] + (1.5 - prev_d[0]) * frac;
-                        for y in 1..river_len {
-                            if blocking_gate_y.is_some_and(|gy| y >= gy) {
-                                // Raised floodgate diverts incoming badwater upstream of gy
-                                self.river_contam[y] = (prev_c[y] - 0.5 * sub_dt).max(0.0);
-                                self.river_depth[y] =
-                                    (prev_d[y] - EVAP_WIDE_POOL_PER_DAY * sub_dt).max(0.0);
-                            } else {
-                                self.river_contam[y] =
-                                    prev_c[y] + (prev_c[y - 1] - prev_c[y]) * frac;
-                                self.river_depth[y] =
-                                    prev_d[y] + (prev_d[y - 1] - prev_d[y]) * frac;
-                            }
-                        }
-                    }
-                }
-            } else {
-                let target_depth = if max_gate_height >= 0.8 {
-                    (max_gate_height + 0.2).min(2.2)
-                } else if has_dam {
-                    1.6
-                } else {
-                    1.4
-                };
-                let prev_c = self.river_contam.clone();
-                let prev_d = self.river_depth.clone();
-                // Temperate river source immediately emits clean fresh water (0.0 contam),
-                // flushing badwater downstream tile-by-tile at WATER_PROPAGATION_TILES_PER_DAY.
-                self.river_contam[0] = (prev_c[0] * (1.0 - frac)).max(0.0);
-                self.river_depth[0] = (prev_d[0] + 0.6 * sub_dt).min(target_depth);
-                for y in 1..river_len {
-                    let blocked = blocking_gate_y.is_some_and(|gy| y >= gy);
-                    if blocked && prev_c[y - 1] > prev_c[y] {
-                        // Raised floodgate still holds back lingering upstream badwater
-                        self.river_contam[y] = (prev_c[y] - 0.5 * sub_dt).max(0.0);
-                    } else {
-                        self.river_contam[y] = (prev_c[y] + (prev_c[y - 1] - prev_c[y]) * frac
-                            - 0.5 * sub_dt)
-                            .max(0.0);
-                    }
-                    self.river_depth[y] = (prev_d[y] + (prev_d[y - 1] - prev_d[y]) * frac)
-                        .max((prev_d[y] + 0.6 * sub_dt).min(target_depth));
-                }
-            }
-        }
-        self.reservoir_water_depth = self.river_depth[intake_y];
-        self.river_contamination = self.river_contam[intake_y];
+        // Update 2D 32x32 river water, badwater, floodgate blocking, and irrigation grid
+        self.update_2d_water_and_irrigation(dt);
 
         // Track badwater contamination exposure (`CONTAMINATION_ONSET_DAYS = 3.0d`)
         let exposed_to_badwater = self.river_contamination >= IRRIGATION_POLLUTION_CUTOFF;
@@ -1081,7 +1014,8 @@ impl MockWorld {
         }
         self.was_contaminated = colony_contaminated;
 
-        // Rebalance worker assignment & housing (contaminated beavers refuse work!)
+        // Recompute 2D path reachability, worker assignment & connected-component power grid
+        self.update_reachability();
         self.rebalance_workers_and_housing();
         self.update_power_grid();
 
@@ -1115,7 +1049,7 @@ impl MockWorld {
             .buildings
             .iter()
             .enumerate()
-            .filter(|(_, b)| b.finished == 0 && b.paused == 0)
+            .filter(|(_, b)| b.finished == 0 && b.paused == 0 && b.reachable.unwrap_or(1) == 1)
             .map(|(i, _)| i)
             .collect();
         site_indices.sort_by(|&a, &b| {
@@ -1211,8 +1145,7 @@ impl MockWorld {
         let mut science_prod = 0.0_f64;
         let mut fermented_prod = 0.0_f64;
 
-        let irrigated = self.reservoir_water_depth > 0.05
-            && self.river_contamination < IRRIGATION_POLLUTION_CUTOFF;
+        let haul_mult = self.hauling_efficiency();
         let primary_crop = if self.is_iron_teeth() {
             "Kohlrabi"
         } else {
@@ -1226,14 +1159,14 @@ impl MockWorld {
             if b.name.contains("Tank") {
                 water_cap += b.capacity.unwrap_or(30) as f64;
             }
-            if b.paused == 1 {
+            if b.paused == 1 || b.reachable.unwrap_or(1) == 0 {
                 continue;
             }
             let workers = b.assigned_workers.unwrap_or(0) as f64;
             if workers <= 0.0 {
                 continue;
             }
-            let eff = distance_efficiency((b.x - dc_x).abs() + (b.y - dc_y).abs());
+            let eff = distance_efficiency((b.x - dc_x).abs() + (b.y - dc_y).abs()) * haul_mult;
             if b.name.contains("LargeWaterPump") {
                 if self.reservoir_water_depth > 0.05
                     && self.river_contamination < IRRIGATION_POLLUTION_CUTOFF
@@ -1287,31 +1220,43 @@ impl MockWorld {
         }
 
         // Grow trees using verified multi-day growth durations (`tree_spec`: Birch 9d, Pine 12d, Oak 30d).
-        // Trees require irrigation to grow.
+        // Trees check 2D per-tile irrigation (`moist_grid[y * 32 + x]`).
+        let moist_snapshot = self.moist_grid.clone();
+        let tile_moist = |x: i32, y: i32| -> bool {
+            if !(0..32).contains(&x) || !(0..32).contains(&y) {
+                return false;
+            }
+            moist_snapshot[(y as usize) * 32 + (x as usize)]
+        };
         for t in &mut self.trees {
             if t.alive != 1 {
                 continue;
             }
             let (grow_days, _) = tree_spec(&t.name);
             let mut g = t.growth.unwrap_or(0.0);
-            if irrigated && g < 1.0 {
+            if tile_moist(t.x, t.y) && g < 1.0 {
                 g = (g + dt / grow_days).min(1.0);
                 t.growth = Some(g);
                 t.grown = Some(if g >= 1.0 { 1 } else { 0 });
             }
         }
 
-        // Staffed Forester plants new Pine saplings (`growth = 0.0`, 12d to mature) when irrigated
-        if irrigated && forester_plant_cap >= 1.0 && self.trees.len() < 120 {
+        // Staffed Forester plants new Pine saplings (`growth = 0.0`, 12d to mature) on irrigated tiles
+        if forester_plant_cap >= 1.0 && self.trees.len() < 120 {
             let to_plant = (forester_plant_cap.floor() as usize).min(120 - self.trees.len());
             for _ in 0..to_plant {
                 let idx = self.trees.len() as i32;
+                let tx = 20 + (idx % 6);
+                let ty = 10 + (idx / 6) % 10;
+                if !tile_moist(tx, ty) {
+                    continue;
+                }
                 let id = self.alloc_id();
                 self.trees.push(Plant {
                     id,
                     name: "Pine".to_string(),
-                    x: 22 + (idx % 8),
-                    y: 10 + (idx / 8) % 10,
+                    x: tx,
+                    y: ty,
                     z: 2,
                     alive: 1,
                     growth: Some(0.0),
@@ -1321,7 +1266,7 @@ impl MockWorld {
             }
         }
 
-        // Grow and harvest crops using verified growth days & yields (`crop_spec`)
+        // Grow and harvest crops using verified growth days & yields (`crop_spec`) and 2D per-tile moisture
         let mut harvested_food = 0.0_f64;
         for c in &mut self.crops {
             if c.alive != 1 {
@@ -1329,7 +1274,8 @@ impl MockWorld {
             }
             let (grow_days, yield_amt) = crop_spec(&c.name);
             let mut g = c.growth.unwrap_or(0.0);
-            if irrigated && g < 1.0 {
+            let c_irrigated = tile_moist(c.x, c.y);
+            if c_irrigated && g < 1.0 {
                 g = (g + dt / grow_days).min(1.0);
                 c.growth = Some(g);
                 c.grown = Some(if g >= 1.0 { 1 } else { 0 });
@@ -1337,8 +1283,8 @@ impl MockWorld {
             if g >= 1.0 && crop_harvest_cap >= yield_amt {
                 crop_harvest_cap -= yield_amt;
                 harvested_food += yield_amt;
-                // Automatically replanted if irrigated
-                if irrigated {
+                // Automatically replanted if tile is irrigated
+                if c_irrigated {
                     c.growth = Some(0.0);
                     c.grown = Some(0);
                 } else {
@@ -1592,15 +1538,391 @@ impl MockWorld {
         events
     }
 
+    /// Update 2D 32x32 water/badwater grids along river columns x=9..=11 with per-tile floodgate
+    /// blocking, lateral river mixing, verified evaporation rates, and 2D irrigation reach.
+    pub fn update_2d_water_and_irrigation(&mut self, dt: f64) {
+        let w = 32usize;
+        let h = 32usize;
+        let intake_y = 14usize;
+
+        let max_gate_height = self
+            .buildings
+            .iter()
+            .filter(|b| b.finished == 1 && b.floodgate == Some(1))
+            .filter_map(|b| b.height)
+            .fold(0.0_f64, f64::max);
+        let has_dam = self
+            .buildings
+            .iter()
+            .any(|b| b.finished == 1 && b.name.starts_with("Dam."));
+
+        // Build 2D mask of cells blocked by finished raised floodgates (`height >= 0.8`).
+        // A center-channel floodgate at x == 10 spans the full 3-tile river sluice (x=9..=11)
+        // to remain compatible with single-gate scenarios; off-center gates (x=9 or x=11) block
+        // only their own column so badwater can bypass through unblocked columns!
+        let mut gate_blocked = vec![false; w * h];
+        for b in &self.buildings {
+            if b.finished == 1 && b.floodgate == Some(1) && b.height.unwrap_or(0.0) >= 0.8 {
+                let fy = b.y.clamp(0, (h - 1) as i32) as usize;
+                let fx = b.x.clamp(0, (w - 1) as i32) as usize;
+                if fx == 10 {
+                    for rx in 9..=11 {
+                        gate_blocked[fy * w + rx] = true;
+                    }
+                } else {
+                    gate_blocked[fy * w + fx] = true;
+                }
+            }
+        }
+
+        // Sync grid from river_depth/river_contam if external test directly mutated `river_depth`
+        if (self.water_grid[intake_y * w + 10] - self.river_depth[intake_y]).abs() > 1e-6 {
+            for y in 0..h {
+                for x in 9..=11 {
+                    self.water_grid[y * w + x] = self.river_depth[y];
+                    self.contam_grid[y * w + x] = self.river_contam[y];
+                }
+            }
+        }
+
+        let step_dt = 1.0 / WATER_PROPAGATION_TILES_PER_DAY;
+        let mut remaining_dt = dt;
+        while remaining_dt > 1e-9 {
+            let sub_dt = remaining_dt.min(step_dt);
+            let frac = (sub_dt / step_dt).clamp(0.0, 1.0);
+            remaining_dt -= sub_dt;
+
+            if self.is_hazardous {
+                match self.hazard_kind {
+                    HazardKind::Drought => {
+                        let evap = if max_gate_height >= DAM_SPILL_HEIGHT || has_dam {
+                            EVAP_WIDE_POOL_PER_DAY
+                        } else if max_gate_height > 0.0 {
+                            EVAP_MEDIUM_CHANNEL_PER_DAY
+                        } else {
+                            EVAP_NARROW_CHANNEL_PER_DAY
+                        };
+                        for y in 0..h {
+                            for x in 9..=11 {
+                                let idx = y * w + x;
+                                self.contam_grid[idx] =
+                                    (self.contam_grid[idx] - 0.5 * sub_dt).max(0.0);
+                                self.water_grid[idx] =
+                                    (self.water_grid[idx] - evap * sub_dt).max(0.0);
+                            }
+                        }
+                    }
+                    HazardKind::Badtide => {
+                        let prev_c = self.contam_grid.clone();
+                        let prev_d = self.water_grid.clone();
+                        for x in 9..=11 {
+                            let idx0 = x;
+                            self.contam_grid[idx0] = prev_c[idx0] + (0.95 - prev_c[idx0]) * frac;
+                            self.water_grid[idx0] = prev_d[idx0] + (1.5 - prev_d[idx0]) * frac;
+                        }
+                        for y in 1..h {
+                            for x in 9..=11 {
+                                let idx = y * w + x;
+                                let up = (y - 1) * w + x;
+                                if gate_blocked[idx] {
+                                    self.contam_grid[idx] = (prev_c[idx] - 0.5 * sub_dt).max(0.0);
+                                    self.water_grid[idx] =
+                                        (prev_d[idx] - EVAP_WIDE_POOL_PER_DAY * sub_dt).max(0.0);
+                                } else {
+                                    self.contam_grid[idx] =
+                                        prev_c[idx] + (prev_c[up] - prev_c[idx]) * frac;
+                                    self.water_grid[idx] =
+                                        prev_d[idx] + (prev_d[up] - prev_d[idx]) * frac;
+                                }
+                            }
+                            // Lateral mixing across unblocked adjacent river columns (x=9..=11)
+                            let row_c = [
+                                self.contam_grid[y * w + 9],
+                                self.contam_grid[y * w + 10],
+                                self.contam_grid[y * w + 11],
+                            ];
+                            for (i, x) in (9..=11).enumerate() {
+                                let idx = y * w + x;
+                                if gate_blocked[idx] {
+                                    continue;
+                                }
+                                let mut max_nb = row_c[i];
+                                if i > 0 && !gate_blocked[y * w + (x - 1)] {
+                                    max_nb = max_nb.max(row_c[i - 1]);
+                                }
+                                if i < 2 && !gate_blocked[y * w + (x + 1)] {
+                                    max_nb = max_nb.max(row_c[i + 1]);
+                                }
+                                if max_nb > row_c[i] {
+                                    self.contam_grid[idx] =
+                                        row_c[i] + (max_nb - row_c[i]) * (0.5 * frac);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                let target_depth = if max_gate_height >= 0.8 {
+                    (max_gate_height + 0.2).min(2.2)
+                } else if has_dam {
+                    1.6
+                } else {
+                    1.4
+                };
+                let prev_c = self.contam_grid.clone();
+                let prev_d = self.water_grid.clone();
+                for x in 9..=11 {
+                    self.contam_grid[x] = (prev_c[x] * (1.0 - frac)).max(0.0);
+                    self.water_grid[x] = (prev_d[x] + 0.6 * sub_dt).min(target_depth);
+                }
+                for y in 1..h {
+                    for x in 9..=11 {
+                        let idx = y * w + x;
+                        let up = (y - 1) * w + x;
+                        if gate_blocked[idx] && prev_c[up] > prev_c[idx] {
+                            self.contam_grid[idx] = (prev_c[idx] - 0.5 * sub_dt).max(0.0);
+                        } else {
+                            self.contam_grid[idx] =
+                                (prev_c[idx] + (prev_c[up] - prev_c[idx]) * frac - 0.5 * sub_dt)
+                                    .max(0.0);
+                        }
+                        self.water_grid[idx] = (prev_d[idx] + (prev_d[up] - prev_d[idx]) * frac)
+                            .max((prev_d[idx] + 0.6 * sub_dt).min(target_depth));
+                    }
+                }
+            }
+        }
+
+        // Sync 1D row summaries and scalar intake readings from center channel x=10
+        for y in 0..h {
+            self.river_depth[y] = self.water_grid[y * w + 10];
+            self.river_contam[y] = self.contam_grid[y * w + 10];
+        }
+        self.reservoir_water_depth = self.river_depth[intake_y];
+        self.river_contamination = self.river_contam[intake_y];
+        self.recompute_moist_grid();
+    }
+
+    /// Recompute 2D soil moisture (`moist_grid`) using verified Timberborn 1.1 irrigation reach
+    /// (`IRRIGATION_MAX_RADIUS = 16` from clean wet river tiles with `< 50%` badwater).
+    pub fn recompute_moist_grid(&mut self) {
+        let w = 32usize;
+        let h = 32usize;
+        self.moist_grid.fill(false);
+
+        // Multi-source BFS from all clean wet river tiles up to IRRIGATION_MAX_RADIUS
+        let mut dist = vec![i32::MAX; w * h];
+        let mut q = VecDeque::new();
+        for y in 0..h {
+            for x in 9..=11 {
+                let idx = y * w + x;
+                if self.water_grid[idx] > 0.05
+                    && self.contam_grid[idx] < IRRIGATION_POLLUTION_CUTOFF
+                {
+                    dist[idx] = 0;
+                    self.moist_grid[idx] = true;
+                    q.push_back((x as i32, y as i32));
+                }
+            }
+        }
+        while let Some((cx, cy)) = q.pop_front() {
+            let cd = dist[(cy as usize) * w + (cx as usize)];
+            if cd >= IRRIGATION_MAX_RADIUS {
+                continue;
+            }
+            for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                let nx = cx + dx;
+                let ny = cy + dy;
+                if !(0..32).contains(&nx) || !(0..32).contains(&ny) {
+                    continue;
+                }
+                let nidx = (ny as usize) * w + (nx as usize);
+                // Contaminated river tiles act as irrigation barriers
+                if (9..=11).contains(&nx) && self.contam_grid[nidx] >= IRRIGATION_POLLUTION_CUTOFF {
+                    continue;
+                }
+                if cd + 1 < dist[nidx] {
+                    dist[nidx] = cd + 1;
+                    self.moist_grid[nidx] = true;
+                    q.push_back((nx, ny));
+                }
+            }
+        }
+    }
+
+    pub fn is_tile_irrigated(&self, x: i32, y: i32) -> bool {
+        if !(0..32).contains(&x) || !(0..32).contains(&y) {
+            return false;
+        }
+        self.moist_grid[(y as usize) * 32 + (x as usize)]
+    }
+
+    /// 2D BFS path reachability from all finished `DistrictCenter` buildings across `Path*` tiles
+    /// and adjacent connected buildings. Sites outside the DC core (`Manhattan > 10`) with no path
+    /// chain are marked `reachable = Some(0)` and cannot be built or worked until linked by `Path` tiles.
+    pub fn update_reachability(&mut self) {
+        let dcs: Vec<(i32, i32)> = self
+            .buildings
+            .iter()
+            .filter(|b| b.finished == 1 && b.name.starts_with("DistrictCenter"))
+            .map(|b| (b.x, b.y))
+            .collect();
+        if dcs.is_empty() {
+            for b in &mut self.buildings {
+                b.reachable = Some(1);
+            }
+            return;
+        }
+
+        let n = self.buildings.len();
+        let mut visited = vec![false; n];
+        let mut q = VecDeque::new();
+
+        // Seed all buildings within core DistrictCenter walking radius (Manhattan <= 10)
+        // or directly on a DistrictCenter
+        for (i, b) in self.buildings.iter().enumerate() {
+            let near_dc = dcs
+                .iter()
+                .any(|&(dx, dy)| (b.x - dx).abs() + (b.y - dy).abs() <= 10);
+            if near_dc {
+                visited[i] = true;
+                q.push_back(i);
+            }
+        }
+
+        // Expand along Path tiles (step <= 2) and adjacent buildings (step <= 2)
+        while let Some(u) = q.pop_front() {
+            let ux = self.buildings[u].x;
+            let uy = self.buildings[u].y;
+            let u_is_path = self.buildings[u].name.contains("Path");
+            for v in 0..n {
+                if visited[v] {
+                    continue;
+                }
+                let vx = self.buildings[v].x;
+                let vy = self.buildings[v].y;
+                let dist = (ux - vx).abs().max((uy - vy).abs());
+                let v_is_path = self.buildings[v].name.contains("Path");
+                let max_step = if u_is_path || v_is_path { 2 } else { 3 };
+                if dist <= max_step {
+                    visited[v] = true;
+                    q.push_back(v);
+                }
+            }
+        }
+
+        for (i, b) in self.buildings.iter_mut().enumerate() {
+            b.reachable = Some(if visited[i] { 1 } else { 0 });
+        }
+    }
+
+    /// Approximated hauling bottleneck multiplier: when 0 builders/idle adults exist to haul
+    /// across >= 4 active workplaces, workplace throughput drops to `HAULING_BOTTLENECK_MULT` (0.75x).
+    pub fn hauling_efficiency(&self) -> f64 {
+        let healthy_adults = self
+            .beavers
+            .iter()
+            .filter(|b| {
+                b.is_bot == 0
+                    && b.life_progress.unwrap_or(0.5) >= 0.2
+                    && b.contaminated.unwrap_or(0) == 0
+            })
+            .count() as u32;
+        let assigned_total: u32 = self
+            .buildings
+            .iter()
+            .filter(|b| b.finished == 1 && b.paused == 0)
+            .map(|b| b.assigned_workers.unwrap_or(0))
+            .sum();
+        let active_builders: u32 = self
+            .buildings
+            .iter()
+            .filter(|b| {
+                b.finished == 1
+                    && b.paused == 0
+                    && (b.name.starts_with("DistrictCenter") || b.name.starts_with("BuildersHut"))
+            })
+            .map(|b| b.assigned_workers.unwrap_or(0))
+            .sum();
+        let active_workplaces = self
+            .buildings
+            .iter()
+            .filter(|b| {
+                b.finished == 1
+                    && b.paused == 0
+                    && b.assigned_workers.unwrap_or(0) > 0
+                    && !b.name.starts_with("DistrictCenter")
+            })
+            .count();
+        let idle_adults = healthy_adults.saturating_sub(assigned_total);
+        if idle_adults == 0 && active_builders == 0 && active_workplaces >= 4 {
+            HAULING_BOTTLENECK_MULT
+        } else {
+            1.0
+        }
+    }
+
+    fn is_power_node(b: &Building) -> bool {
+        b.finished == 1
+            && b.paused == 0
+            && (b.is_generator == Some(1)
+                || b.is_consumer == Some(1)
+                || b.name.contains("PowerShaft"))
+    }
+
+    fn compute_power_components(&self) -> Vec<Vec<usize>> {
+        let nodes: Vec<usize> = self
+            .buildings
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| Self::is_power_node(b))
+            .map(|(i, _)| i)
+            .collect();
+        let mut seen = vec![false; nodes.len()];
+        let mut comps = Vec::new();
+        for start in 0..nodes.len() {
+            if seen[start] {
+                continue;
+            }
+            seen[start] = true;
+            let mut comp = Vec::new();
+            let mut q = VecDeque::new();
+            q.push_back(start);
+            while let Some(u) = q.pop_front() {
+                let ui = nodes[u];
+                comp.push(ui);
+                let ub = &self.buildings[ui];
+                for v in 0..nodes.len() {
+                    if seen[v] {
+                        continue;
+                    }
+                    let vb = &self.buildings[nodes[v]];
+                    let cheb = (ub.x - vb.x).abs().max((ub.y - vb.y).abs());
+                    if cheb <= POWER_CONNECT_CHEBYSHEV_DIST {
+                        seen[v] = true;
+                        q.push_back(v);
+                    }
+                }
+            }
+            comps.push(comp);
+        }
+        comps
+    }
+
+    /// Connected-component power grid solver: generators only power consumers in the same
+    /// 2D connected component (linked within `POWER_CONNECT_CHEBYSHEV_DIST` or via `PowerShaft`).
     pub fn update_power_grid(&mut self) {
-        let mut total_supply = 0.0_f64;
-        let mut total_demand = 0.0_f64;
         let flowing = !self.is_hazardous && self.reservoir_water_depth > 0.2;
 
         for b in &mut self.buildings {
-            if b.finished == 0 || b.paused == 1 {
+            if b.finished == 0 || b.paused == 1 || b.reachable.unwrap_or(1) == 0 {
                 b.power_supply = Some(0.0);
                 b.power_demand = Some(0.0);
+                if b.nominal_power_input.unwrap_or(0.0) > 0.0 {
+                    b.powered = Some(0);
+                } else {
+                    b.powered = Some(1);
+                }
                 continue;
             }
             let nom_out = b.nominal_power_output.unwrap_or(0.0);
@@ -1620,50 +1942,63 @@ impl MockWorld {
                     nom_out
                 };
                 b.power_supply = Some(actual);
-                total_supply += actual;
+            } else {
+                b.power_supply = Some(0.0);
             }
-            if nom_in > 0.0 {
-                b.power_demand = Some(nom_in);
-                total_demand += nom_in;
-            }
+            b.power_demand = Some(nom_in);
+            b.powered = Some(if nom_in > 0.0 { 0 } else { 1 });
         }
 
-        let grid_ok = total_demand <= 0.0 || total_supply >= total_demand;
-        for b in &mut self.buildings {
-            if b.nominal_power_input.unwrap_or(0.0) > 0.0 {
-                b.powered = Some(if grid_ok { 1 } else { 0 });
-            } else {
-                b.powered = Some(1);
+        let comps = self.compute_power_components();
+        for comp in comps {
+            let supply: f64 = comp
+                .iter()
+                .map(|&i| self.buildings[i].power_supply.unwrap_or(0.0))
+                .sum();
+            let demand: f64 = comp
+                .iter()
+                .map(|&i| self.buildings[i].power_demand.unwrap_or(0.0))
+                .sum();
+            let comp_ok = demand <= 0.0 || supply >= demand;
+            for &i in &comp {
+                if self.buildings[i].nominal_power_input.unwrap_or(0.0) > 0.0 {
+                    self.buildings[i].powered = Some(if comp_ok { 1 } else { 0 });
+                }
             }
         }
     }
 
     pub fn power_networks(&self) -> Vec<PowerNetwork> {
-        let mut supply = 0.0_f64;
-        let mut demand = 0.0_f64;
-        let mut buildings = Vec::new();
-        for b in &self.buildings {
-            if b.finished == 1 && (b.is_generator == Some(1) || b.is_consumer == Some(1)) {
-                supply += b.power_supply.unwrap_or(0.0);
-                demand += b.power_demand.unwrap_or(0.0);
-                buildings.push(PowerBuilding {
-                    id: b.id,
-                    name: b.name.clone(),
-                    is_generator: b.is_generator.unwrap_or(0),
-                    nominal_input: b.nominal_power_input.unwrap_or(0.0),
-                    nominal_output: b.nominal_power_output.unwrap_or(0.0),
+        let comps = self.compute_power_components();
+        let mut out = Vec::new();
+        for (idx, comp) in comps.into_iter().enumerate() {
+            let mut supply = 0.0_f64;
+            let mut demand = 0.0_f64;
+            let mut buildings = Vec::new();
+            for i in comp {
+                let b = &self.buildings[i];
+                if b.is_generator == Some(1) || b.is_consumer == Some(1) {
+                    supply += b.power_supply.unwrap_or(0.0);
+                    demand += b.power_demand.unwrap_or(0.0);
+                    buildings.push(PowerBuilding {
+                        id: b.id,
+                        name: b.name.clone(),
+                        is_generator: b.is_generator.unwrap_or(0),
+                        nominal_input: b.nominal_power_input.unwrap_or(0.0),
+                        nominal_output: b.nominal_power_output.unwrap_or(0.0),
+                    });
+                }
+            }
+            if !buildings.is_empty() {
+                out.push(PowerNetwork {
+                    id: (idx + 1) as i64,
+                    supply,
+                    demand,
+                    buildings,
                 });
             }
         }
-        if buildings.is_empty() {
-            return Vec::new();
-        }
-        vec![PowerNetwork {
-            id: 1,
-            supply,
-            demand,
-            buildings,
-        }]
+        out
     }
 
     pub fn rebalance_workers_and_housing(&mut self) {
@@ -1689,7 +2024,7 @@ impl MockWorld {
 
         for i in indices {
             let b = &mut self.buildings[i];
-            if b.finished == 0 || b.paused == 1 {
+            if b.finished == 0 || b.paused == 1 || b.reachable.unwrap_or(1) == 0 {
                 b.assigned_workers = Some(0);
                 continue;
             }
@@ -2024,30 +2359,27 @@ impl MockWorld {
         let max_y = y1.max(y2).min(self.map_size.y as i32 - 1);
         let mut out = Vec::new();
         for y in min_y..=max_y {
-            let row_idx = (y as usize).min(self.river_depth.len().saturating_sub(1));
-            let row_depth = self
-                .river_depth
-                .get(row_idx)
-                .copied()
-                .unwrap_or(self.reservoir_water_depth);
-            let row_contam = self
-                .river_contam
-                .get(row_idx)
-                .copied()
-                .unwrap_or(self.river_contamination);
-            let row_irrigated = row_depth > 0.05 && row_contam < IRRIGATION_POLLUTION_CUTOFF;
             for x in min_x..=max_x {
                 // River runs along x in 9..=11
                 let in_river = (9..=11).contains(&x);
+                let idx = (y as usize) * 32 + (x as usize);
                 let terrain = if in_river { 1 } else { 2 };
-                let water = if in_river { row_depth } else { 0.0 };
-                let badwater = if in_river { row_contam } else { 0.0 };
+                let water = if in_river {
+                    self.water_grid.get(idx).copied().unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+                let badwater = if in_river {
+                    self.contam_grid.get(idx).copied().unwrap_or(0.0)
+                } else {
+                    0.0
+                };
                 let contaminated = if in_river && badwater >= IRRIGATION_POLLUTION_CUTOFF {
                     1
                 } else {
                     0
                 };
-                let moist = if (7..=14).contains(&x) && row_irrigated {
+                let moist = if self.moist_grid.get(idx).copied().unwrap_or(false) {
                     1
                 } else {
                     0
@@ -2244,7 +2576,9 @@ impl MockWorld {
         };
         let b = make_building(id, &sb);
         self.buildings.push(b);
+        self.update_reachability();
         self.rebalance_workers_and_housing();
+        self.update_power_grid();
         Ok(json!({
             "id": id,
             "prefab": req.prefab,

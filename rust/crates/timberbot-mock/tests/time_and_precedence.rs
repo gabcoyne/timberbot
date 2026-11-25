@@ -248,6 +248,7 @@ fn full_material_power_and_science_precedence_chain() {
         ("WaterWheel.Folktails", 10, 16, 1),
         ("WaterWheel.Folktails", 10, 17, 1),
         ("WaterWheel.Folktails", 10, 18, 1),
+        ("PowerShaft.Folktails", 13, 16, 2),
     ] {
         world
             .place_building(&PlaceBuildingRequest {

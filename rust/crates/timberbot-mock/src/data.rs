@@ -177,13 +177,19 @@ pub const EVAP_MEDIUM_CHANNEL_PER_DAY: f64 = 0.096;
 pub const EVAP_NARROW_CHANNEL_PER_DAY: f64 = 0.200;
 /// Pollution threshold at or above which river tiles cease irrigating adjacent land (`50%`).
 pub const IRRIGATION_POLLUTION_CUTOFF: f64 = 0.50;
+/// Verified max horizontal irrigation reach for a 3+ wide clean river (`timberborn.wiki.gg/wiki/Irrigation`).
+pub const IRRIGATION_MAX_RADIUS: i32 = 16;
 
-// --- Approximated Time-Lag Constants (documented as `approximated` in `docs/mock-fidelity.md`) ---
+// --- Approximated Time-Lag & 2D Topology Constants (documented in `docs/mock-fidelity.md`) ---
 
-/// Approximated downstream river wave propagation speed (`tiles/day`, 1 tile/game-hour) across the 1D mock channel.
+/// Approximated downstream river wave propagation speed (`tiles/day`, 1 tile/game-hour) across the 2D river grid.
 pub const WATER_PROPAGATION_TILES_PER_DAY: f64 = 24.0;
 /// Approximated construction material hauling rate (`items / builder-hour` at base distance <= 6).
 pub const HAUL_ITEMS_PER_BUILDER_HOUR: f64 = 12.0;
+/// Approximated Chebyshev adjacency distance for connected power-shaft/building components.
+pub const POWER_CONNECT_CHEBYSHEV_DIST: i32 = 3;
+/// Approximated workplace throughput multiplier when 0 haulers/idle adults serve >= 4 active workplaces.
+pub const HAULING_BOTTLENECK_MULT: f64 = 0.75;
 
 // --- Verified & Approximated Production & Reproduction ---
 
@@ -320,6 +326,7 @@ pub const BUILDING_SPECS: &[BuildingSpec] = &[
     spec!(name: "TripleFloodgate.Folktails", size: (1,1,3), sp: 500, unlocked: false, costs: &[("Log", 20), ("Plank", 15)], workers: 0, beds: 0, cap: None, fg: Some(3.0), p_out: 0.0, p_in: 0.0, build_h: 16.0),
     spec!(name: "Inventor.Folktails", size: (2,2,2), sp: 0, unlocked: true, costs: &[("Log", 12)], workers: 1, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 0.0, build_h: 6.0),
     spec!(name: "PowerWheel.Folktails", size: (3,1,2), sp: 0, unlocked: true, costs: &[("Log", 10)], workers: 1, beds: 0, cap: None, fg: None, p_out: 50.0, p_in: 0.0, build_h: 8.0),
+    spec!(name: "PowerShaft.Folktails", size: (1,1,1), sp: 0, unlocked: true, costs: &[("Log", 1)], workers: 0, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 0.0, build_h: 1.0),
     spec!(name: "WaterWheel.Folktails", size: (3,1,2), sp: 0, unlocked: true, costs: &[("Log", 50)], workers: 0, beds: 0, cap: None, fg: None, p_out: 180.0, p_in: 0.0, build_h: 12.0),
     spec!(name: "LumberMill.Folktails", size: (2,3,3), sp: 0, unlocked: true, costs: &[("Log", 15)], workers: 1, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 50.0, build_h: 8.0),
     spec!(name: "GearWorkshop.Folktails", size: (2,3,2), sp: 100, unlocked: false, costs: &[("Log", 15), ("Plank", 25)], workers: 1, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 120.0, build_h: 12.0),
@@ -344,6 +351,7 @@ pub const BUILDING_SPECS: &[BuildingSpec] = &[
     spec!(name: "DoubleFloodgate.IronTeeth", size: (1,1,2), sp: 250, unlocked: false, costs: &[("Log", 15), ("Plank", 10)], workers: 0, beds: 0, cap: None, fg: Some(2.0), p_out: 0.0, p_in: 0.0, build_h: 12.0),
     spec!(name: "Inventor.IronTeeth", size: (2,2,2), sp: 0, unlocked: true, costs: &[("Log", 12)], workers: 1, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 0.0, build_h: 6.0),
     spec!(name: "LargePowerWheel.IronTeeth", size: (2,3,3), sp: 0, unlocked: true, costs: &[("Log", 25)], workers: 4, beds: 0, cap: None, fg: None, p_out: 300.0, p_in: 0.0, build_h: 10.0),
+    spec!(name: "PowerShaft.IronTeeth", size: (1,1,1), sp: 0, unlocked: true, costs: &[("Log", 1)], workers: 0, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 0.0, build_h: 1.0),
     spec!(name: "CompactWaterWheel.IronTeeth", size: (2,1,2), sp: 0, unlocked: true, costs: &[("Log", 40)], workers: 0, beds: 0, cap: None, fg: None, p_out: 120.0, p_in: 0.0, build_h: 10.0),
     spec!(name: "LumberMill.IronTeeth", size: (2,3,3), sp: 0, unlocked: true, costs: &[("Log", 15)], workers: 1, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 50.0, build_h: 8.0),
     spec!(name: "GearWorkshop.IronTeeth", size: (2,3,2), sp: 100, unlocked: false, costs: &[("Log", 15), ("Plank", 25)], workers: 1, beds: 0, cap: None, fg: None, p_out: 0.0, p_in: 120.0, build_h: 12.0),
