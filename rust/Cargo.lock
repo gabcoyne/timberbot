@@ -1458,6 +1458,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "timberbot-eval"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "timberbot-state",
+ "timberbot-tactics",
+]
+
+[[package]]
 name = "timberbot-mcp"
 version = "0.1.0"
 dependencies = [
@@ -1510,6 +1521,28 @@ dependencies = [
  "thiserror 1.0.69",
  "timberbot-protocol",
  "zip",
+]
+
+[[package]]
+name = "timberbot-state"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "timberbot-client",
+ "timberbot-protocol",
+]
+
+[[package]]
+name = "timberbot-tactics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "timberbot-client",
+ "timberbot-protocol",
+ "timberbot-state",
 ]
 
 [[package]]

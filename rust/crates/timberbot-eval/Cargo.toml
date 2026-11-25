@@ -1,0 +1,15 @@
+[package]
+name = "timberbot-eval"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Layer 3 JSONL trace logger, offline decide() evaluator, and 4-layer miss classifier"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+timberbot-state.workspace = true
+timberbot-tactics.workspace = true

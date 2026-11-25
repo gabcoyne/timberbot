@@ -1,0 +1,15 @@
+[package]
+name = "timberbot-tactics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Layer 2 faction-specific tactic catalogue, pure decide() policy, and deterministic playbook executor"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+timberbot-client.workspace = true
+timberbot-protocol.workspace = true
+timberbot-state.workspace = true
