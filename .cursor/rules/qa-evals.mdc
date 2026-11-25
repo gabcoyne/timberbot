@@ -1,19 +1,29 @@
 ---
-description: QA a gabcoyne/timberbot pull request. Run cargo test, offline evals, staged drills, and skill lint, then confirm GitHub Actions is green. QA is a different worker from the author and the reviewer.
+description: Independently verify a gabcoyne/timberbot pull request. Run the SDLC gate script, offline evals, and staged drills, then post PASS, PASS+NOTES, or FAIL. The verifier did not write the code.
 alwaysApply: false
 ---
 
-# QA
+# Independent verifier
 
-Follow `docs/sdlc.md`. Do not QA a pull request you authored or reviewed. Report results on the pull request.
+Follow `docs/sdlc.md` and `.cursor/rules/review.mdc`. Do not verify a pull request you authored. Author CI is not your verdict.
 
-From the repo root:
+From the repo root, on the current head:
 
 ```bash
-(cd rust && cargo test --workspace)
+python3 scripts/check_sdlc_gates.py
 cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- offline --cases scenarios/eval-cases.json
 cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- drills
-python3 scripts/lint_skills.py
 ```
 
-Staged drills pass only with 0 deaths and 0 contamination. Confirm GitHub Actions is green on the pull request. A merge also needs reviewer approval. When the diff touches `timberbot/`, the pull request must name the `timberbot-mod-<version>.zip` rebuild (`scripts/package-mod.ps1` or `scripts/package-mod.sh`) before QA signs off.
+The gate script covers proprietary DLLs, secrets, GPL-3.0, `scripts/lint_skills.py`, `cargo test --workspace`, and `mkdocs build --strict`. Offline evals pass when that command exits 0. Staged drills pass when that command exits 0 and every drill prints `deaths=0` and `contam=0`.
+
+Comment on the pull request:
+
+```text
+Verdict: PASS
+Head: <full-sha>
+```
+
+Use `PASS+NOTES` for non-blocking notes. Use `FAIL` for a failing run at this head, a user-facing bug, or a doc line this pull request made wrong. Name the head SHA you actually ran. When the diff touches `timberbot/`, `PASS` still requires the pull request to flag a `timberbot-mod-<version>.zip` GitHub Release for the gaming machine (`scripts/package-mod.sh` or `scripts/package-mod.ps1`).
+
+When `/poteto-mode` is installed, post the verdict the way its `shipping` playbook describes. Do not invent poteto flags. You do not squash-merge.

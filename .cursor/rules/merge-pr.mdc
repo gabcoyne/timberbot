@@ -1,0 +1,23 @@
+---
+description: Squash-merge a gabcoyne/timberbot pull request after an independent PASS or PASS+NOTES on the current head, green CI, and a clean merge into main.
+alwaysApply: false
+---
+
+# Merge
+
+Follow `docs/sdlc.md`. Squash-merge only when all of these hold for the current head SHA:
+
+- A verifier who did not write the code posted `PASS` or `PASS+NOTES` for that SHA.
+- GitHub Actions, including the `sdlc-gates` workflow, is green on that SHA.
+- The pull request is open, not draft, targets `main`, and merges cleanly.
+
+```bash
+gh pr merge <number> --squash
+gh pr view <number> --json state,mergedAt,baseRefName,mergeCommit
+git fetch origin main
+git merge-base --is-ancestor <merge-commit> origin/main
+```
+
+Confirm `state` is `MERGED`, `baseRefName` is `main`, and the merge commit is an ancestor of `origin/main`. Never force-push `main`. A diff that touches `timberbot/` still needs the gaming machine to publish `timberbot-mod-<version>.zip`.
+
+When `/poteto-mode` is installed, the squash command is the one in its `shipping` playbook (`gh pr merge <pr> --squash`). Read the pull request back after the command. Do not invent poteto flags.

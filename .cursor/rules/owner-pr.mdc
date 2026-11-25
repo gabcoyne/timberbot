@@ -1,0 +1,16 @@
+---
+description: One owner opens one gabcoyne/timberbot pull request off main, ready for review. The owner does not verify their own change.
+alwaysApply: false
+---
+
+# Owner
+
+Follow `docs/sdlc.md`. You are the only owner of this pull request. You do not post its independent verdict.
+
+1. Branch from fresh `origin/main`. One pull request. Base ref is `main`. Do not stack it on another pull request.
+2. Open it ready for review. Never draft. Title: `type(scope): subject`. Body at most 40 lines, with `## Why`, `## What changed`, `## Scope`, `## Tradeoffs`, `## Blast Radius`, `## Verification`, dropping any empty heading.
+3. Add a regression test, or an offline eval or staged-drill case, for a reported failure. Use `Closes #<issue>` when the pull request fixes an issue.
+4. If the diff touches `timberbot/`, say the gaming machine must publish a `timberbot-mod-<version>.zip` GitHub Release built with `scripts/package-mod.sh` or `scripts/package-mod.ps1`.
+5. Never commit secrets or Timberborn or Unity DLLs. Never force-push `main`.
+
+When `/poteto-mode` is installed, follow its `opening-a-pr` and `autopilot-full` playbooks. This repository does not add poteto flags. `babysit` gets the pull request merge-ready and does not authorize the merge.

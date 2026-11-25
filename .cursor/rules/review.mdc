@@ -1,18 +1,20 @@
 ---
-description: Review a gabcoyne/timberbot pull request for correctness, Rust safety, license, secrets, and game DLLs. The reviewer is a different worker from the author.
+description: Independent verification is the gabcoyne/timberbot merge gate. Block only for a failing run at this head, a user-facing bug, or a doc line this pull request made wrong.
 alwaysApply: false
 ---
 
-# Review
+# Verification bar
 
-Follow `docs/sdlc.md`. Do not review a pull request you authored. Approve or request changes in the pull request review.
+Follow `docs/sdlc.md`. The worker who posts the verdict did not write the code. A green CI run is not a verdict, and a separate approving review is not the merge gate.
 
-Check:
+`python3 scripts/check_sdlc_gates.py` already fails proprietary DLLs, high-confidence secrets, a dropped GPL-3.0 root license, skill lint, Rust tests, and `mkdocs build --strict`. Read the diff for what those commands cannot see.
 
-- Correctness of the change.
-- Rust safety: no unguarded panics or unwraps on live paths.
-- GPL-3.0. No secrets. No Timberborn or Unity game DLLs in the diff.
-- Docs and skills stay consistent with the change.
-- One small pull request targeting `main`, not stacked on an unmerged branch, with `Closes #<issue>`.
-- A regression test, or an offline eval or staged-drill case, covers the reported failure.
-- If the diff touches `timberbot/`, the pull request says the gaming machine must rebuild and upload `timberbot-mod-<version>.zip` with `scripts/package-mod.ps1` or `scripts/package-mod.sh`.
+Block the pull request only when one of these is true at the current head:
+
+- A required run fails (`scripts/check_sdlc_gates.py`, offline evals, or staged drills).
+- A user would hit a bug this pull request introduces or newly reaches.
+- A doc line this pull request added or edited is wrong.
+
+Anything else is a `PASS+NOTES` note or a follow-up. A problem already on `main` does not block unless this pull request copies it or newly reaches it. Record the verdict on the pull request with the full head SHA (`PASS`, `PASS+NOTES`, or `FAIL`). A new head needs a new verdict.
+
+When `/poteto-mode` is installed, this bar is the one in `autopilot-full` and `shipping`. Do not invent poteto flags.
