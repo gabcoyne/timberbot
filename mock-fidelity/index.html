@@ -1,0 +1,1859 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Full read/write HTTP API for controlling Timberborn with AI (modified fork of abix-/TimberbornMods)">
+      
+      
+      
+        <link rel="canonical" href="https://impuls42.github.io/timberbot/mock-fidelity/">
+      
+      
+        <link rel="prev" href="../connect-and-play/">
+      
+      
+        <link rel="next" href="../four-layer-outer-loop/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
+    
+    
+      
+        <title>Mock fidelity - Timberbot API</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mock-fidelity-timberborn-11-source-matrix" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Timberbot API" class="md-header__button md-logo" aria-label="Timberbot API" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Timberbot API
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Mock fidelity
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/impuls42/timberbot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    impuls42/timberbot
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Timberbot API" class="md-nav__button md-logo" aria-label="Timberbot API" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Timberbot API
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/impuls42/timberbot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    impuls42/timberbot
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timberbot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timberbot Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../websocket-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebSocket Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../macos-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sdlc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDLC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devenv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../game-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Game build pin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../remote-access/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote access
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connect-and-play/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connect & Play
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mock fidelity
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mock fidelity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#status-legend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Legend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-mod-http-websocket-failure-mode-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Mod HTTP, WebSocket &amp; Failure-Mode Fidelity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-timberborn-11-gameplay-mechanics-data-table-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Timberborn 1.1 Gameplay Mechanics &amp; Data Table Fidelity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Timberborn 1.1 Gameplay Mechanics &amp; Data Table Fidelity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-difficulty-presets-game-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Difficulty Presets (Game Modes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-beaver-bot-needs-consumption-and-death-timers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Beaver &amp; Bot Needs, Consumption, and Death Timers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-housing-reproduction-folktails-iron-teeth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Housing &amp; Reproduction (Folktails &amp; Iron Teeth)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-water-pumping-tanks-dams-floodgates-evaporation-irrigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Water Pumping, Tanks, Dams, Floodgates, Evaporation &amp; Irrigation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-crops-food-processing-wood-science-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Crops, Food Processing, Wood, Science &amp; Power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-wellbeing-monuments-wonders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Wellbeing, Monuments &amp; Wonders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-timber-save-map-archive-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 .timber Save / Map Archive Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-intentional-approximations-in-timberbot-mock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Intentional Approximations in timberbot-mock
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../four-layer-outer-loop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Four-layer outer loop
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unreleased/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#status-legend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status Legend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-mod-http-websocket-failure-mode-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Mod HTTP, WebSocket &amp; Failure-Mode Fidelity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-timberborn-11-gameplay-mechanics-data-table-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Timberborn 1.1 Gameplay Mechanics &amp; Data Table Fidelity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Timberborn 1.1 Gameplay Mechanics &amp; Data Table Fidelity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-difficulty-presets-game-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Difficulty Presets (Game Modes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-beaver-bot-needs-consumption-and-death-timers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Beaver &amp; Bot Needs, Consumption, and Death Timers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-housing-reproduction-folktails-iron-teeth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Housing &amp; Reproduction (Folktails &amp; Iron Teeth)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-water-pumping-tanks-dams-floodgates-evaporation-irrigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Water Pumping, Tanks, Dams, Floodgates, Evaporation &amp; Irrigation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-crops-food-processing-wood-science-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Crops, Food Processing, Wood, Science &amp; Power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-wellbeing-monuments-wonders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Wellbeing, Monuments &amp; Wonders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-timber-save-map-archive-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 .timber Save / Map Archive Format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-intentional-approximations-in-timberbot-mock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Intentional Approximations in timberbot-mock
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="mock-fidelity-timberborn-11-source-matrix">Mock Fidelity &amp; Timberborn 1.1 Source Matrix<a class="headerlink" href="#mock-fidelity-timberborn-11-source-matrix" title="Permanent link">&para;</a></h1>
+<p>This document records the exact provenance of every HTTP/WebSocket API shape, failure mode, and Timberborn 1.1 game mechanic modeled in <code>rust/crates/timberbot-mock</code>, <code>rust/crates/timberbot-protocol</code>, <code>rust/crates/timberbot-save</code>, and <code>skills/</code>.</p>
+<p>No number is marked <strong>verified</strong> without a cited primary source. Everything else is explicitly labeled <strong>approximated</strong> (intentional simplification for deterministic offline CI) or <strong>guess</strong> / <strong>unverified</strong> (requires a live Timberborn 1.1 install and playtest).</p>
+<h2 id="status-legend">Status Legend<a class="headerlink" href="#status-legend" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>verified</strong></td>
+<td>Confirmed directly from this repository's C# mod source (<code>timberbot/src/*.cs</code>), recorded golden OpenAPI fixtures (<code>python/tests/fixtures/openapi/*.json</code>), <code>openapi.yaml</code>, official Timberborn Wiki (<code>timberborn.wiki.gg</code>), Mechanistry Update 1.1 patch notes, or <code>0xguy07/timberborn-tools</code> (verified on 1.1.2.4).</td>
+</tr>
+<tr>
+<td><strong>approximated</strong></td>
+<td>Real-game value or rule is known, but <code>timberbot-mock</code> intentionally uses a simplified deterministic model (e.g., 1D river depth instead of 3D Unity fluid solver, simplified path reachability) so offline tests run fast and repeatably.</td>
+</tr>
+<tr>
+<td><strong>guess</strong></td>
+<td>Not yet proven from primary public docs or a live Timberborn 1.1 binary; treated as unverified and flagged for real-game confirmation.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-mod-http-websocket-failure-mode-fidelity">1. Mod HTTP, WebSocket &amp; Failure-Mode Fidelity<a class="headerlink" href="#1-mod-http-websocket-failure-mode-fidelity" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Surface / Behavior</th>
+<th>Real-Game Source</th>
+<th>Status</th>
+<th>Mock Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HTTP port <code>8085</code>, WS port <code>8086</code> (<code>/api/ws</code>), <strong>no <code>POST /mcp</code> on mod</strong></td>
+<td><code>timberbot/src/TimberbotService.cs:63-65</code>, <code>TimberbotHttpServer.cs</code>, <code>openapi.yaml</code></td>
+<td><strong>verified</strong></td>
+<td>Mock binds separate HTTP + WS listeners; MCP runs out-of-process in <code>timberbot-mcp</code> (stdio) or <code>tbot serve</code> (<code>127.0.0.1:8091/sse</code>).</td>
+</tr>
+<tr>
+<td>Non-loopback <code>listenAddress</code> refuses to start when <code>authToken</code> is empty</td>
+<td><code>timberbot/src/TimberbotPure.cs</code> (<code>RequiresAuthToken</code>), <code>TimberbotService.cs</code></td>
+<td><strong>verified</strong></td>
+<td><code>timberbot_protocol::requires_auth_token</code> + <code>RunningMockServer::start</code> mirror the exact guard.</td>
+</tr>
+<tr>
+<td>Bearer auth: <code>401</code> + <code>WWW-Authenticate: Bearer realm="timberbot"</code> + <code>{"error":"unauthorized: missing or invalid bearer token"}</code>; <code>/api/ping</code> exempt</td>
+<td><code>timberbot/src/TimberbotHttpServer.cs:259-273</code></td>
+<td><strong>verified</strong></td>
+<td>Constant-time token comparison via <code>subtle::ConstantTimeEq</code>.</td>
+</tr>
+<tr>
+<td>Ready gate: <code>409</code> + <code>{"error":"game_not_ready","hint":"player must press Launch in the Timberbot widget"}</code>; exempt: <code>/api/ping</code>, <code>/api/ready</code>, <code>/api/agent/*</code></td>
+<td><code>timberbot/src/TimberbotHttpServer.cs:279-285</code>, <code>TimberbotAgentState.cs:356-371</code></td>
+<td><strong>verified</strong></td>
+<td>Exact byte-compatible 409 JSON body.</td>
+</tr>
+<tr>
+<td>Body size cap (<code>maxBodyBytes</code>, default <code>1048576</code>): <code>413</code> + <code>{"error":"body_too_large: ..."}</code></td>
+<td><code>timberbot/src/TimberbotHttpServer.cs:365</code>, <code>TimberbotService.cs:74</code></td>
+<td><strong>verified</strong></td>
+<td>Enforced in <code>timberbot-mock</code> HTTP server.</td>
+</tr>
+<tr>
+<td>POST write-job queue: background HTTP listener enqueues to <code>ConcurrentQueue</code>; Unity main thread drains up to 10 POSTs/frame (<code>_writeBudgetMs = 1.0</code>)</td>
+<td><code>timberbot/src/TimberbotHttpServer.cs:6,139-225</code>, <code>TimberbotService.cs:67</code></td>
+<td><strong>approximated</strong></td>
+<td>Mock serializes writes through an async FIFO write queue with configurable drain/latency so queue ordering and backpressure are testable without Unity's frame loop.</td>
+</tr>
+<tr>
+<td><code>GET /api/ping</code> → <code>{"status":"ok","ready":true,"openapiVersion":"1.0.0"}</code></td>
+<td><code>timberbot/src/TimberbotHttpServer.cs:287-290</code>, <code>python/tests/fixtures/openapi/ping.json</code></td>
+<td><strong>verified</strong></td>
+<td>Byte-compatible JSON shape; <code>ready: true</code> indicates HTTP server readiness (distinct from <code>agent/state.ready</code>).</td>
+</tr>
+<tr>
+<td><code>GET /api/settlement</code>, <code>/api/time</code>, <code>/api/weather</code>, <code>/api/speed</code>, <code>/api/workhours</code>, <code>/api/agent/state</code></td>
+<td><code>timberbot/src/TimberbotReadV2.cs</code>, <code>python/tests/fixtures/openapi/{settlement,time,weather,speed,workhours,agent_state}.json</code></td>
+<td><strong>verified</strong></td>
+<td>Exact JSON keys verified against recorded golden fixtures. Note <code>/api/weather</code> JSON uses <code>temperateWeatherDuration</code>/<code>hazardousWeatherDuration</code>/<code>cycleLengthInDays</code> (whereas compact <code>?format=toon</code> summary uses <code>tempDays</code>/<code>hazardDays</code>).</td>
+</tr>
+<tr>
+<td><code>GET /api/summary?format=json</code> (<code>alerts</code>, <code>buildings</code>, <code>crops</code>, <code>districts</code>, <code>faction</code>, <code>foodClusters</code>, <code>science</code>, <code>settlement</code>, <code>time</code>, <code>treeClusters</code>, <code>trees</code>, <code>weather</code>, <code>wellbeing</code>)</td>
+<td><code>timberbot/src/TimberbotReadV2.cs</code>, <code>python/tests/fixtures/openapi/summary.json</code></td>
+<td><strong>verified</strong></td>
+<td>Mock matches all recorded top-level keys including <code>trees</code> and <code>wellbeing</code> as well as district <code>population</code>, <code>resources</code>, <code>housing</code>, <code>employment</code>, <code>wellbeing</code>, and <code>dc</code>.</td>
+</tr>
+<tr>
+<td><code>GET /api/buildings?format=json</code> (<code>items</code>, <code>limit</code>, <code>offset</code>, <code>total</code>, including <code>effectRadius</code>, <code>isWonder</code>, <code>needsNutrients</code>, <code>allowedGood</code>, <code>currentRecipe</code>, <code>automation</code>)</td>
+<td><code>timberbot/src/TimberbotReadV2.cs</code>, <code>python/tests/fixtures/openapi/buildings.json</code></td>
+<td><strong>verified</strong></td>
+<td>Exact field names and types aligned with golden <code>buildings.json</code>.</td>
+</tr>
+<tr>
+<td><code>GET /api/beavers?format=json</code> (<code>items</code>, <code>limit</code>, <code>offset</code>, <code>total</code>, including <code>carryAmount</code>, <code>carrying</code>, <code>liftingCapacity</code>, <code>needs</code>)</td>
+<td><code>timberbot/src/TimberbotReadV2.cs</code>, <code>python/tests/fixtures/openapi/beavers.json</code></td>
+<td><strong>verified</strong></td>
+<td>Exact field names and types aligned with golden <code>beavers.json</code>.</td>
+</tr>
+<tr>
+<td><code>GET /api/tiles?format=json</code> (<code>mapSize</code>, optional <code>region</code>, <code>tiles[].{x,y,terrain,water,badwater,entrance,seedling,dead,contaminated,moist,occupants}</code>)</td>
+<td><code>timberbot/src/TimberbotReadV2.cs:1184-1258</code>, <code>python/tests/fixtures/openapi/tiles.json</code></td>
+<td><strong>verified</strong></td>
+<td>Note: real mod emits <code>terrain</code>, <code>water</code>, <code>badwater</code>, and <code>occupants: [{name, z}]</code> (NOT <code>terrainHeight</code>/<code>waterDepth</code>/<code>contamination</code>).</td>
+</tr>
+<tr>
+<td><code>GET /api/resources</code>, <code>/api/districts</code>, <code>/api/population</code>, <code>/api/power</code>, <code>/api/science</code>, <code>/api/wellbeing</code>, <code>/api/prefabs</code>, <code>/api/alerts</code>, <code>/api/notifications</code>, <code>/api/distribution</code>, <code>/api/trees</code>, <code>/api/crops</code>, <code>/api/gatherables</code>, <code>/api/tree-clusters</code>, <code>/api/food-clusters</code></td>
+<td><code>timberbot/src/TimberbotReadV2.cs</code>, <code>python/tests/fixtures/openapi/*.json</code></td>
+<td><strong>verified</strong></td>
+<td>All 26 golden fixture schemas verified in Rust contract tests.</td>
+</tr>
+<tr>
+<td>POST endpoints &amp; error prefixes (<code>not_found</code>, <code>invalid_prefab</code>, <code>invalid_type</code>, <code>invalid_param</code>, <code>not_unlocked</code>, <code>insufficient_science</code>, <code>no_population</code>, <code>disabled</code>, <code>operation_failed</code>)</td>
+<td><code>timberbot/src/TimberbotWrite.cs</code>, <code>TimberbotPlacement.cs</code>, <code>TimberbotJw.cs:133-156</code>, <code>openapi.yaml</code></td>
+<td><strong>verified</strong></td>
+<td>Priority accepts 5 levels (<code>VeryLow</code>..<code>VeryHigh</code>); <code>ConfigureAutomation</code> omits <code>WeatherStation</code>, <code>Timer</code>, and Floodgate On/Off preset heights; <strong>no <code>/api/save</code> endpoint exists</strong>.</td>
+</tr>
+<tr>
+<td>WebSocket <code>:8086/api/ws</code> envelope <code>{"type":"state"|"event"|"pong","payload":...}</code>, initial <code>state</code> push, <code>heartbeat</code> request ack, <code>ping</code>/<code>pong</code>, bearer auth via header or <code>?token=</code></td>
+<td><code>timberbot/src/TimberbotWebSocketServer.cs</code>, <code>docs/websocket-protocol.md</code></td>
+<td><strong>verified</strong></td>
+<td>Not ready-gated; broadcasts <code>drought.approaching</code>, <code>drought.start</code>, <code>drought.end</code>, <code>day.start</code>, <code>night.start</code>, <code>cycle.start</code>, <code>cycle.end</code>, <code>building.finished</code>, <code>beaver.died</code>, <code>character.killed</code>, <code>population.changed</code>, <code>game.over</code>.</td>
+</tr>
+<tr>
+<td>Official built-in HTTP Lever / HTTP Adapter API (<code>localhost:8080/api/levers</code>, <code>switch-on</code>, <code>switch-off</code>, <code>color</code>, <code>adapters</code>)</td>
+<td><a href="https://timberborn.wiki.gg/wiki/HTTP_Lever">Official Wiki: HTTP Lever</a> / <a href="https://timberborn.wiki.gg/wiki/HTTP_Adapter">HTTP Adapter</a>, <code>skills/timberborn-control-http-levers/SKILL.md</code></td>
+<td><strong>verified</strong></td>
+<td>Optional mock listener on <code>:8080</code> (or ephemeral port in tests); exposed in <code>timberbot-mcp</code> as <code>lever_*</code> and <code>adapter_*</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-timberborn-11-gameplay-mechanics-data-table-fidelity">2. Timberborn 1.1 Gameplay Mechanics &amp; Data Table Fidelity<a class="headerlink" href="#2-timberborn-11-gameplay-mechanics-data-table-fidelity" title="Permanent link">&para;</a></h2>
+<h3 id="21-difficulty-presets-game-modes">2.1 Difficulty Presets (Game Modes)<a class="headerlink" href="#21-difficulty-presets-game-modes" title="Permanent link">&para;</a></h3>
+<p>Source: <a href="https://timberborn.wiki.gg/wiki/Game_Mode">Official Timberborn Wiki — Game Mode</a> (current 1.0+ preset table; note older pre-1.0 versions had 8 adults and 6-cycle Normal drought handicap).</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Easy</th>
+<th>Normal</th>
+<th>Hard</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Starting adults / children</td>
+<td>9 / 4</td>
+<td>9 / 4</td>
+<td>9 / 4</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Food / Water consumption multiplier</td>
+<td>40% (<code>0.4</code>)</td>
+<td>100% (<code>1.0</code>)</td>
+<td>100% (<code>1.0</code>)</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Starting food / water</td>
+<td>300 / 250</td>
+<td>130 / 0</td>
+<td>90 / 0</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Temperate duration (days)</td>
+<td>16–19</td>
+<td>13–17</td>
+<td>5–8</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Drought duration (days)</td>
+<td>2–4</td>
+<td>5–9</td>
+<td>15–30</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Drought duration handicap</td>
+<td>25% for 8 cycles</td>
+<td>38% for 5 cycles</td>
+<td>20% for 12 cycles</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Badtide-free initial cycles</td>
+<td>5</td>
+<td>4</td>
+<td>3</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Badtide chance (after initial cycles)</td>
+<td>40%</td>
+<td>40%</td>
+<td>40%</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Badtide duration (days)</td>
+<td>1–3</td>
+<td>4–8</td>
+<td>15–30</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Badtide duration handicap</td>
+<td>30% for 6 cycles</td>
+<td>15% for 5 cycles</td>
+<td>40% for 9 cycles</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+<tr>
+<td>Injury chance / Building demolish refund</td>
+<td>30% / 90%</td>
+<td>100% / 75%</td>
+<td>100% / 75%</td>
+<td><strong>verified</strong> (wiki Game Mode)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-beaver-bot-needs-consumption-and-death-timers">2.2 Beaver &amp; Bot Needs, Consumption, and Death Timers<a class="headerlink" href="#22-beaver-bot-needs-consumption-and-death-timers" title="Permanent link">&para;</a></h3>
+<p>Source: <a href="https://timberborn.wiki.gg/wiki/Needs">Official Timberborn Wiki — Needs</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Mechanic</th>
+<th>Real-Game Value</th>
+<th>Status</th>
+<th>Mock Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hunger decay &amp; consumption (at 100%)</td>
+<td>Range <code>-300..100</code>, decay <code>80/day</code>, food <code>+30/unit</code> → <strong><code>2.67 food/day</code></strong>; full→death <code>5.0 d</code>, starving→death <code>3.75 d</code>; <code>-10</code> WB, <code>-50%</code> work speed</td>
+<td><strong>verified</strong></td>
+<td>Scaled by difficulty food multiplier (<code>0.4</code> Easy, <code>1.0</code> Normal/Hard). Mock tracks per-colony/beaver need decay and triggers starvation deaths after <code>3.75</code> starving days (5.0d from full).</td>
+</tr>
+<tr>
+<td>Thirst decay &amp; consumption (at 100%)</td>
+<td>Range <code>-300..100</code>, decay <code>70/day</code>, water <code>+33/unit</code> → <strong><code>2.12 water/day</code></strong> (<code>70/33 ≈ 2.121</code>, wiki notes <code>2.13</code>); full→death <code>5.71 d</code>, thirsty→death <code>4.29 d</code>; <code>-10</code> WB, <code>-25%</code> move speed</td>
+<td><strong>verified</strong></td>
+<td>Scaled by difficulty water multiplier. Mock tracks dehydration decay and triggers deaths after <code>4.29</code> thirsty days (5.71d from full).</td>
+</tr>
+<tr>
+<td>Sleep &amp; Shelter</td>
+<td>Sleep <code>-20..80</code>, decay <code>60/day</code> (<code>+20/h</code> sheltered, <code>+15/h</code> outside); Shelter <code>-20..80</code>, decay <code>30/day</code>, unsheltered <code>-3</code> WB &amp; blocks Folktails breeding</td>
+<td><strong>verified</strong></td>
+<td>Shelter homelessness penalty (<code>-3</code> WB) and Folktails breeding gate modeled in mock.</td>
+</tr>
+<tr>
+<td>Badwater contamination</td>
+<td>3 days Unwell → Contaminated (<code>-10</code> WB, <code>-70%</code> speed, refuses work); cured by Antidote (<code>4 d</code>, <code>8</code> units) or Decontamination Pod (<code>1.23 d</code>)</td>
+<td><strong>verified</strong></td>
+<td>Mock tracks contamination stress when river contamination exceeds 50% and pumps/beavers are exposed.</td>
+</tr>
+<tr>
+<td>Bot energy / Biofuel</td>
+<td>Range <code>0..100</code>, decay <code>58/day</code>, Biofuel <code>+30/unit</code> → <strong><code>1.93 Biofuel/day</code></strong>; Catalyst/Punchcards/Grease <code>+30/unit</code>, decay <code>20/day</code> (<code>0.67/day</code>)</td>
+<td><strong>verified</strong></td>
+<td>Data table constant; bot fuel consumption approximated when bots &gt; 0.</td>
+</tr>
+<tr>
+<td>Beaver carrying capacity</td>
+<td>Base lifting capacity <strong><code>14</code></strong></td>
+<td><strong>verified</strong> (<code>python/tests/fixtures/openapi/beavers.json</code>, wiki Needs History)</td>
+<td>Emitted as <code>liftingCapacity: 14</code> in mock <code>/api/beavers</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-housing-reproduction-folktails-iron-teeth">2.3 Housing &amp; Reproduction (Folktails &amp; Iron Teeth)<a class="headerlink" href="#23-housing-reproduction-folktails-iron-teeth" title="Permanent link">&para;</a></h3>
+<p>Sources: <a href="https://timberborn.wiki.gg/wiki/Housing">Official Wiki — Housing</a>, <a href="https://timberborn.wiki.gg/wiki/Breeding_Pod">Official Wiki — Breeding Pod</a>, <code>python/tests/fixtures/openapi/prefabs.json</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Building</th>
+<th>Faction</th>
+<th>Size (X×Y×Z)</th>
+<th>Unlock SP</th>
+<th>Build Cost</th>
+<th>Inhabitants / Output</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Lodge.Folktails</code></td>
+<td>Folktails</td>
+<td><code>2×2×1</code></td>
+<td>0</td>
+<td>12 Log</td>
+<td><strong>3</strong> beds; breeds when ≥2 adults &amp; free bed</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Housing)</td>
+</tr>
+<tr>
+<td><code>MiniLodge.Folktails</code></td>
+<td>Folktails</td>
+<td><code>1×2×1</code></td>
+<td>50</td>
+<td>5 Log</td>
+<td><strong>1</strong> bed</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Housing)</td>
+</tr>
+<tr>
+<td><code>DoubleLodge.Folktails</code></td>
+<td>Folktails</td>
+<td><code>2×2×2</code></td>
+<td>150</td>
+<td>20 Log</td>
+<td><strong>6</strong> beds</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Housing)</td>
+</tr>
+<tr>
+<td><code>TripleLodge.Folktails</code></td>
+<td>Folktails</td>
+<td><code>3×2×2</code></td>
+<td>250</td>
+<td>35 Log</td>
+<td><strong>9</strong> beds</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Housing)</td>
+</tr>
+<tr>
+<td><code>Barrack.IronTeeth</code></td>
+<td>Iron Teeth</td>
+<td><code>3×2×2</code></td>
+<td>0</td>
+<td>40 Log</td>
+<td><strong>10</strong> beds (no natural breeding)</td>
+<td><strong>verified</strong> (wiki Housing; exact prefab suffix approximated by convention)</td>
+</tr>
+<tr>
+<td><code>LargeBarrack.IronTeeth</code></td>
+<td>Iron Teeth</td>
+<td><code>3×3×2</code></td>
+<td>400</td>
+<td>70 Log</td>
+<td><strong>16</strong> beds</td>
+<td><strong>verified</strong> (wiki Housing)</td>
+</tr>
+<tr>
+<td><code>Rowhouse.IronTeeth</code></td>
+<td>Iron Teeth</td>
+<td><code>2×1×3</code></td>
+<td>180</td>
+<td>20 Log</td>
+<td><strong>5</strong> beds</td>
+<td><strong>verified</strong> (wiki Housing)</td>
+</tr>
+<tr>
+<td><code>LargeRowhouse.IronTeeth</code></td>
+<td>Iron Teeth</td>
+<td><code>2×1×4</code></td>
+<td>600</td>
+<td>35 Log</td>
+<td><strong>8</strong> beds</td>
+<td><strong>verified</strong> (wiki Housing)</td>
+</tr>
+<tr>
+<td><code>BreedingPod.IronTeeth</code></td>
+<td>Iron Teeth</td>
+<td><code>1×1×1</code></td>
+<td>0</td>
+<td>10 Log</td>
+<td><strong>5 Water + 5 Berries / 5 days → 1 kit</strong></td>
+<td><strong>verified</strong> (wiki Breeding Pod)</td>
+</tr>
+<tr>
+<td><code>AdvancedBreedingPod.IronTeeth</code></td>
+<td>Iron Teeth</td>
+<td><code>1×1×2</code></td>
+<td>1000</td>
+<td>5 Gear, 2 MetalBlock</td>
+<td>5 Water + 5 Berries → 1 adult</td>
+<td><strong>verified</strong> (wiki Housing)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="24-water-pumping-tanks-dams-floodgates-evaporation-irrigation">2.4 Water Pumping, Tanks, Dams, Floodgates, Evaporation &amp; Irrigation<a class="headerlink" href="#24-water-pumping-tanks-dams-floodgates-evaporation-irrigation" title="Permanent link">&para;</a></h3>
+<p>Sources: <a href="https://timberborn.wiki.gg/wiki/Water_Pump">Wiki — Water Pump</a>, <a href="https://timberborn.wiki.gg/wiki/Deep_Water_Pump">Deep Water Pump</a>, <a href="https://timberborn.wiki.gg/wiki/Tanks">Tanks</a>, <a href="https://timberborn.wiki.gg/wiki/Dam">Dam</a>, <a href="https://timberborn.wiki.gg/wiki/Floodgates">Floodgates</a>, <a href="https://timberborn.wiki.gg/wiki/Evaporation">Evaporation</a>, <a href="https://timberborn.wiki.gg/wiki/Fluids">Fluids</a>, <a href="https://timberborn.wiki.gg/wiki/Irrigation">Irrigation</a>, <code>prefabs.json</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Mechanic / Building</th>
+<th>Real-Game Value</th>
+<th>Status</th>
+<th>Mock Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WaterPump.Folktails</code> / <code>DeepWaterPump.IronTeeth</code></td>
+<td><code>2×3×3</code> (<code>prefabs.json</code>), 0 SP, 12 Log, 1 worker, <strong><code>0.33 h → 1 Water</code> (<code>3 Water/hr</code>)</strong>, internal storage 15, max depth 2 (FT) / 6 (IT). Reduced efficiency at higher badwater %.</td>
+<td><strong>verified</strong></td>
+<td>Mock scales pump output by <code>3.0 × effective_work_hours × work_speed_mult × (1 - contamination)</code>, stopping if reservoir is dry or contamination ≥ 50%.</td>
+</tr>
+<tr>
+<td><code>LargeWaterPump.Folktails</code></td>
+<td><code>3×4×4</code>, 400 SP, 20 Log + 5 Gear + 10 TreatedPlank; 5× pump rate (<code>15 Water/hr</code>)</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Fluids)</td>
+<td>Included in data table.</td>
+</tr>
+<tr>
+<td>Tanks: <code>SmallTank</code> / <code>MediumTank</code> / <code>LargeTank</code></td>
+<td>Small: <code>1×1×2</code>, 0 SP, <strong>15 Log</strong>, cap <strong>30</strong>. Medium: <code>2×2×3</code>, 120 SP, <strong>30 Plank + 20 Gear</strong>, cap <strong>300</strong>. Large: <code>3×3×3</code>, 600 SP, <strong>80 Plank + 60 Gear + 30 MetalBlock</strong>, cap <strong>1200</strong>.</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Tanks)</td>
+<td>Exact capacities and costs in mock data table.</td>
+</tr>
+<tr>
+<td><code>Dam</code></td>
+<td><code>1×1×1</code>, 0 SP, 20 Log; blocks water up to <strong>0.65 blocks</strong> spill height</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Dam)</td>
+<td>Exact spill height in data table.</td>
+</tr>
+<tr>
+<td><code>Floodgate</code> / <code>DoubleFloodgate</code> / <code>TripleFloodgate</code></td>
+<td><code>1×1×3</code> (150 SP, 10 Log + 5 Plank, max <strong>1.0</strong>), <code>1×1×4</code> (250 SP, 20 Log + 10 Plank, max <strong>2.0</strong>), <code>1×1×5</code> (500 SP, 30 Log + 15 Plank, max <strong>3.0</strong>). Step <code>0.05</code>. Height <code>0</code> = wide open; raising blocks/holds water.</td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Floodgates)</td>
+<td>Mock clamps height to <code>[0.0, max_height]</code> snapped to <code>0.05</code>.</td>
+</tr>
+<tr>
+<td>Time &amp; fluid unit conversion</td>
+<td>1 in-game day = <strong><code>460.8 s</code></strong> real time (1× speed); <code>1 m³</code> fluid = <strong><code>5</code></strong> drinkable Water units; <code>1 m³/s = 460.8 m³/day = 2304 units/day</code></td>
+<td><strong>verified</strong> (wiki Fluids)</td>
+<td>Recorded in data table.</td>
+</tr>
+<tr>
+<td>Evaporation rate</td>
+<td><code>0.04608 m³ × evaporation_value</code> per day; adjusted adjacency score <code>1..8</code> → <code>6.4485</code>..<code>1.1600</code>: <strong><code>~0.053 m/day</code></strong> for ≥3-wide pools, <code>0.096 m/day</code> for 2-wide, <code>0.200 m/day</code> for 1-wide</td>
+<td><strong>verified</strong> (wiki Evaporation)</td>
+<td><strong>approximated</strong> in mock: 3-wide reservoir (<code>0.0534 m/day</code> when held by raised floodgate; faster drainage when gate is open).</td>
+</tr>
+<tr>
+<td>Irrigation &amp; Badwater threshold</td>
+<td>Max range <strong><code>16</code> blocks</strong> (<code>2 × adjusted_adjacency_score</code>) at <code>0%</code> pollution, <code>-6</code> blocks per +1 elevation; soil stops irrigating and becomes contaminated at <strong><code>≥ 50%</code></strong> badwater</td>
+<td><strong>verified</strong> (wiki Irrigation + Evaporation + Fluids)</td>
+<td><strong>approximated</strong> in mock: 2D <code>32×32</code> multi-source BFS (<code>moist_grid</code>) up to verified <code>IRRIGATION_MAX_RADIUS = 16</code> from clean wet river tiles (<code>depth &gt; 0.05</code>, <code>contam &lt; 0.50</code>); elevation falloff (<code>-6</code>/level) is <strong>unverified / not yet modeled</strong> in the flat-bank mock.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="25-crops-food-processing-wood-science-power">2.5 Crops, Food Processing, Wood, Science &amp; Power<a class="headerlink" href="#25-crops-food-processing-wood-science-power" title="Permanent link">&para;</a></h3>
+<p>Sources: <a href="https://timberborn.wiki.gg/wiki/Crops">Wiki — Crops</a>, <a href="https://timberborn.wiki.gg/wiki/Farmhouse">Farmhouse</a>, <a href="https://timberborn.wiki.gg/wiki/Fermenter">Fermenter</a>, <a href="https://timberborn.wiki.gg/wiki/Lumber_Mill">Lumber Mill</a>, <a href="https://timberborn.wiki.gg/wiki/Inventor">Inventor</a>, <a href="https://timberborn.wiki.gg/wiki/Power">Power</a>, <a href="https://timberborn.wiki.gg/wiki/Geothermal_Engine">Geothermal Engine</a>, <a href="https://timberborn.wiki.gg/wiki/Aquifer_Drill">Aquifer Drill</a>, <code>prefabs.json</code>, <code>0xguy07/timberborn-tools</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Building / Crop</th>
+<th>Real-Game Value</th>
+<th>Status</th>
+<th>Mock Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EfficientFarmHouse.Folktails</code></td>
+<td><code>2×3×2</code>, 0 SP, <strong>25 Log</strong>, 2 workers (Folktails). Note capital <code>H</code> in real prefab name!</td>
+<td><strong>verified</strong> (<code>prefabs.json</code>)</td>
+<td>Mock accepts both <code>EfficientFarmHouse.Folktails</code> and legacy alias <code>Farmhouse.Folktails</code> for backwards compatibility.</td>
+</tr>
+<tr>
+<td><code>FarmHouse.IronTeeth</code> / <code>Farmhouse.IronTeeth</code></td>
+<td><code>2×2×2</code>, 0 SP (unlockable 500? wiki shows 20 Log, 2 workers; Iron Teeth crop set: Kohlrabi, Cassava, Soybean, Canola, Corn, Eggplant)</td>
+<td><strong>verified</strong> (wiki Farmhouse; exact prefab casing approximated)</td>
+<td>Supported in mock for Iron Teeth scenarios.</td>
+</tr>
+<tr>
+<td>Folktails crops</td>
+<td>Carrot: <strong>4 d, yield 3</strong> (<code>0.75/d</code>); Sunflower: <strong>5 d, yield 2</strong> (<code>0.40/d</code>); Potato: <strong>6 d, yield 1</strong> (4 grilled = <code>0.67/d</code>); Wheat: <strong>10 d, yield 3</strong>; Cattail: <strong>8 d, yield 3</strong>; Spadderdock: <strong>12 d, yield 3</strong>. Beehive <code>-30%</code> maturity.</td>
+<td><strong>verified</strong> (wiki Crops)</td>
+<td>Exact maturity days &amp; yields in mock data table.</td>
+</tr>
+<tr>
+<td>Iron Teeth crops</td>
+<td>Kohlrabi: <strong>3 d, yield 2</strong> (<code>0.67/d</code>, edible raw); Cassava: <strong>5 d, yield 1</strong> (<code>0.50/d</code> fermented); Soybean: <strong>8 d, yield 2</strong>; Canola: <strong>9 d, yield 3</strong>; Corn: <strong>10 d, yield 2</strong>; Eggplant: <strong>12 d, yield 3</strong>.</td>
+<td><strong>verified</strong> (wiki Crops)</td>
+<td>Exact maturity days &amp; yields in mock data table.</td>
+</tr>
+<tr>
+<td><code>Fermenter.IronTeeth</code></td>
+<td><code>1×3×3</code>, 25 Log, 50 hp, 1 worker: <code>4 Cassava → 10 FermentedCassava</code> (<code>2 h</code>), <code>6 Soybean + 1 CanolaOil → 20 FermentedSoybeans</code> (<code>3 h</code>), <code>4 Mushroom → 16 FermentedMushrooms</code> (<code>2 h</code>)</td>
+<td><strong>verified</strong> (wiki Fermenter)</td>
+<td>Exact recipe ratios in data table; mock simulates Fermenter when staffed &amp; powered.</td>
+</tr>
+<tr>
+<td>Trees, <code>Forester</code> &amp; material chain (<code>LumberMill</code>, <code>GearWorkshop</code>, <code>WoodWorkshop</code>, <code>Smelter</code>, <code>BuildersHut</code>)</td>
+<td>Trees: Birch <strong>9 d / 1 Log</strong>, Pine <strong>12 d / 2 Logs</strong>, Oak <strong>30 d / 8 Logs</strong> (wiki Trees). <code>LumberMill</code>: <code>2×3×3</code>, 0 SP, 15 Log, 50 hp, 1 worker, <strong><code>1 Log → 1 Plank</code> (<code>1.3 h</code>)</strong>. <code>Forester</code>: <code>2×2×4</code>, <strong>30 SP</strong>, <code>10 Log + 7 Plank</code>. <code>BuildersHut</code>: <code>2×2×3</code>, <strong>100 SP</strong>, <code>20 Log + 10 Plank</code>, 4 builders. <code>GearWorkshop</code>: <code>3×3×3</code>, <strong>100 SP</strong>, <code>15 Log + 25 Plank</code>, 120 hp. <code>WoodWorkshop</code>: <code>3×3×3</code>, <strong>800 SP</strong>, <code>20 Log + 40 Plank + 40 Gear</code>, 200 hp. <code>Smelter</code>: <code>3×3×4</code>, <strong>300 SP</strong>, <code>50 Plank + 20 Gear + 30 ScrapMetal</code>, 200 hp.</td>
+<td><strong>verified</strong> (<code>prefabs.json</code>, wiki Trees/Lumber Mill; workshop output rates for Gear/TreatedPlank/MetalBlock &amp; Forester plant rate <strong>approximated</strong>)</td>
+<td>Modeled in mock data table &amp; full <code>Log -&gt; Plank -&gt; Gear -&gt; TreatedPlank -&gt; MetalBlock</code> chain with power &amp; science prerequisites.</td>
+</tr>
+<tr>
+<td><code>Inventor</code></td>
+<td><code>2×2×3</code>, 0 SP, 12 Log, 1 beaver-only worker, <strong><code>1 SP/hr</code></strong></td>
+<td><strong>verified</strong> (<code>prefabs.json</code> + wiki Inventor)</td>
+<td>Mock produces <code>1.0 × work_hours × work_speed_mult</code> SP/day per staffed Inventor.</td>
+</tr>
+<tr>
+<td>Power generators, shafts &amp; consumers</td>
+<td>Power Wheel <code>50 hp</code> (35–85), Large Power Wheel <code>300 hp</code> (4 beavers, max 510), Water Wheel <code>270 hp/(m³/s)</code>, Compact WW <code>120</code>, Large WW <code>540</code>, Wind Turbine <code>150 peak / ~68 avg</code> (120 SP), Large Wind Turbine <code>300 peak / ~144 avg</code> (1400 SP), Steam Engine <code>400 hp</code> (400 SP), Geothermal Engine <strong><code>400 hp</code></strong> (160 SP, 50 Log + 30 Plank, unmanned), Aquifer Drill <strong><code>400 hp</code> consumer</strong> (400 SP, 40 Plank + 25 Gear + 15 MetalBlock), Compact Mechanical Pump <strong><code>700 hp</code></strong> (1.1), (Deep) Mechanical Pump <strong><code>500 hp</code></strong> (1.1 rebalance), <code>PowerShaft</code> (<code>1×1×1</code>, 0 SP, 1 Log).</td>
+<td><strong>verified</strong> (wiki Power, Geothermal Engine, Aquifer Drill, Update 1.1 patch notes, <code>prefabs.json</code>)</td>
+<td><strong>approximated</strong> in mock: 2D connected components (<code>POWER_CONNECT_CHEBYSHEV_DIST = 3</code>) over generators, <code>PowerShaft</code>s, and consumers emit separate <code>PowerNetwork</code>s instead of a global pool; isolated workshops stay <code>powered = 0</code> until linked by shafts/adjacency. Exact shaft face-orientation ports (<code>Straight</code>/<code>Turn</code>/<code>T</code>/<code>Cross</code>/<code>HighPowerShaft</code>) are <strong>unverified / approximated</strong> as isotropic links.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="26-wellbeing-monuments-wonders">2.6 Wellbeing, Monuments &amp; Wonders<a class="headerlink" href="#26-wellbeing-monuments-wonders" title="Permanent link">&para;</a></h3>
+<p>Sources: <code>python/tests/fixtures/openapi/wellbeing.json</code>, <a href="https://timberborn.wiki.gg/wiki/Wonders">Wiki — Wonders</a>, <a href="https://timberborn.wiki.gg/wiki/Earth_Recultivator">Earth Recultivator</a>, <a href="https://timberborn.wiki.gg/wiki/Earth_Repopulator">Earth Repopulator</a>, Update 1.1 patch notes (<code>steamdb.info/patchnotes/25096761/</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Real-Game Value</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Folktails pre-1.1-attractions wellbeing max</td>
+<td><strong><code>78</code></strong> (<code>BasicNeeds 5 + Nutrition 16 + SocialLife 11 + Fun 11 + Aesthetics 9 + Awe 26</code>)</td>
+<td><strong>verified</strong> (<code>python/tests/fixtures/openapi/wellbeing.json</code>)</td>
+</tr>
+<tr>
+<td>Wellbeing work-speed / movement / lifespan curve</td>
+<td>WB 5–6 <code>+20%</code> work speed; WB 15 unlocks Iron Teeth (pre-1.1); WB 67–71 <code>+260%</code> work speed, <code>+120%</code> life expectancy, <code>+70%</code> movement speed</td>
+<td><strong>verified</strong> (<code>0xguy07/timberborn-tools</code> citing wiki) — Iron Teeth unlock on 1.1 remains <strong>unverified</strong></td>
+</tr>
+<tr>
+<td>Wonders (<code>EarthRecultivator</code> / <code>EarthRepopulator</code>)</td>
+<td><code>7×7×8</code> / <code>7×7×10</code>, 20,000 SP, 4 construction stages (25% each), <strong><code>+10</code> Awe in <code>40</code>-tile radius</strong>. Launch: <code>500 Paper + 500 Extract</code> (FT) / <code>500 Berries + 500 TreatedPlank + up to 8 pilots</code> (IT).</td>
+<td><strong>verified</strong> (wiki Wonders, Earth Recultivator, Earth Repopulator, <code>prefabs.json</code>)</td>
+</tr>
+<tr>
+<td>1.1 Tier 4 Monuments (<code>Hall of Abundance</code>, <code>Arch of Progress</code>) &amp; 1.1 Attractions (<code>Sauna</code>, <code>Domed Garden</code>, <code>Massager</code>, <code>Dance Pit</code>)</td>
+<td>Unlock SP &amp; build costs verified from 1.1 patch notes; <strong>exact awe/wellbeing bonus points, radius, and new post-1.1 max wellbeing are NOT published in the patch notes</strong></td>
+<td><strong>guess / unverified</strong></td>
+</tr>
+<tr>
+<td><code>Numbercruncher</code> (Iron Teeth)</td>
+<td>Power demand <strong><code>400 hp</code></strong> verified (wiki Power); exact unlock SP and science output/hr not confirmed from primary source</td>
+<td><strong>partial</strong> (<code>400 hp</code> verified; SP/rate <strong>guess / unverified</strong>)</td>
+</tr>
+<tr>
+<td>Latest Steam/GOG Timberborn build (<code>&gt; 1.1.2.0</code>)</td>
+<td>Manifest pins <code>MinimumGameVersion: 1.1.2.0</code>; live compatibility with latest Steam/GOG build not yet tested</td>
+<td><strong>guess / unverified</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="27-timber-save-map-archive-format">2.7 <code>.timber</code> Save / Map Archive Format<a class="headerlink" href="#27-timber-save-map-archive-format" title="Permanent link">&para;</a></h3>
+<p>Sources: <code>0xguy07/timberborn-tools</code> (<code>bridge/tb_save.py</code>, <code>docs/timber-map-format.md</code>, verified on 1.0.13.1 &amp; 1.1.2.4; MIT license).</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Real-Game Format</th>
+<th>Status</th>
+<th><code>timberbot-save</code> Support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ZIP members</td>
+<td><code>world.json</code>, <code>version.txt</code>, <code>save_metadata.json</code> (saves) or <code>map_metadata.json</code> (maps), thumbnail <code>.jpg</code></td>
+<td><strong>verified</strong> (<code>tb_save.py</code>, <code>Practice Valley.timber</code>)</td>
+<td>Reads <code>world.json</code> + optional <code>version.txt</code> &amp; metadata.</td>
+</tr>
+<tr>
+<td>Terrain voxels (1.0/1.1)</td>
+<td><code>Singletons.TerrainMap.Voxels.Array</code>: space-separated <code>0</code>/<code>1</code>, 23 vertical layers (<code>z * X * Y + y * X + x</code>). Legacy/synthetic saves may use <code>TerrainMap.Heights.Array</code>.</td>
+<td><strong>verified</strong> (<code>tb_save.py</code>, <code>Practice Valley.timber</code>)</td>
+<td>Supports <strong>both</strong> <code>Voxels.Array</code> (23 layers) and <code>Heights.Array</code>.</td>
+</tr>
+<tr>
+<td>Water columns (1.0/1.1)</td>
+<td><code>Singletons.WaterMapNew.WaterColumns.Array</code>: <code>Levels * X * Y</code> entries of <code>"0"</code> or <code>"depth:contamination:?:floorZ:prev"</code>.</td>
+<td><strong>verified</strong> (<code>tb_save.py</code>)</td>
+<td>Parses both colon-delimited 1.1 water columns and plain float arrays.</td>
+</tr>
+<tr>
+<td>Entity inventories</td>
+<td><code>Components["Inventory:*"].Storage.Goods[]</code> with <code>Good</code> (either string ID in 1.0/1.1 or <code>{"Id": ...}</code> object) + <code>Amount</code> (excludes <code>Inventory:ConstructionSite</code>)</td>
+<td><strong>verified</strong> (<code>tb_save.py</code>)</td>
+<td>Supports both string <code>Good</code> and <code>{"Id": ...}</code> forms, skipping <code>Inventory:ConstructionSite</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-intentional-approximations-in-timberbot-mock">3. Intentional Approximations in <code>timberbot-mock</code><a class="headerlink" href="#3-intentional-approximations-in-timberbot-mock" title="Permanent link">&para;</a></h2>
+<p>To keep <code>cargo test --workspace</code> deterministic and fast (~1 s without Unity or game DLLs), <code>timberbot-mock</code> deliberately approximates:</p>
+<ol>
+<li><strong>2D water, floodgate bypass &amp; irrigation grid (<code>approximated</code>)</strong>: Models a 2D <code>32×32</code> tile grid (<code>water_grid</code>, <code>contam_grid</code>, <code>moist_grid</code>) across the 3-wide river channel (<code>x = 9..=11</code>) with downstream wave propagation (<code>WATER_PROPAGATION_TILES_PER_DAY = 24.0</code> tiles/day, <strong>approximated</strong>), per-tile floodgate blocking (center-channel <code>x = 10</code> sluices span the channel; off-center gates at <code>x = 9</code> or <code>x = 11</code> allow 2D lateral bypass), verified wiki evaporation rates (<code>0.0534 m/day</code> wide pool, <code>0.096</code> medium, <code>0.200</code> narrow), and 2D multi-source BFS irrigation up to verified <code>IRRIGATION_MAX_RADIUS = 16</code> from clean wet river tiles (<code>contam &lt; 0.50</code>). Full 3D voxel fluid pressure, waterfalls, and <code>-6</code>-tile elevation irrigation falloff remain <strong>unverified / not modeled</strong>.</li>
+<li><strong>Builder queues &amp; construction work-hours (<code>approximated</code>)</strong>: Only <code>Path</code> and <code>Flag</code> prefabs finish instantly (<code>0.0 h</code>). All real buildings require hauling (<code>HAUL_ITEMS_PER_BUILDER_HOUR = 12.0</code> items/builder-hr, <strong>approximated</strong>) followed by building work-hours (<code>build_work_hours = 4..24 h</code>, <strong>approximated</strong>), processed strictly by active builders (<code>DistrictCenter</code> + finished <code>BuildersHut</code> workers) in <code>construction_priority</code> order (<code>VeryHigh</code> -&gt; <code>VeryLow</code>, FIFO tie-break). Zero builders means zero construction progress.</li>
+<li><strong>2D path connectivity, distance efficiency &amp; hauling bottleneck (<code>approximated</code>)</strong>:</li>
+<li><strong>Reachability (<code>approximated</code>)</strong>: 2D BFS from every finished <code>DistrictCenter</code> (core starter radius Manhattan <code>&lt;= 10</code>) expanding along <code>Path*</code> tiles and adjacent buildings (<code>step &lt;= 2..3</code>). Sites outside the core with no <code>Path</code> chain are marked <code>reachable = 0</code> and cannot be constructed or staffed until linked. Exact <code>BlockObjectSpec</code> entrance tiles, stairs, and 3D terrain cliffs are <strong>unverified / not modeled</strong>.</li>
+<li><strong>Distance efficiency (<code>approximated</code>)</strong>: Workplaces and construction sites within Manhattan distance <code>6</code> of the District Center run at <code>1.0x</code>; beyond <code>6</code> tiles efficiency scales by <code>1 / (1 + 0.025 * (dist - 6))</code>.</li>
+<li><strong>Hauling bottleneck (<code>approximated</code>)</strong>: When zero builders/idle adults exist to haul across <code>&gt;= 4</code> active workplaces, workplace throughput scales by <code>HAULING_BOTTLENECK_MULT = 0.75</code> instead of per-beaver Hauling Post task queues.</li>
+<li><strong>2D connected-component power networks (<code>approximated</code>)</strong>: Power generators, <code>PowerShaft</code> tiles, and powered workshops form 2D connected components (<code>POWER_CONNECT_CHEBYSHEV_DIST = 3</code>) emitting separate <code>PowerNetwork</code> IDs in <code>/api/power</code>. Supply and demand are balanced strictly per network component; disconnected workshops remain unpowered (<code>powered = 0</code>) even when another network has surplus hp. Directional shaft ports (<code>Straight</code>/<code>Turn</code>/<code>T</code>/<code>Cross</code>, vertical shafts) and gear-box routing are <strong>unverified / approximated</strong> as isotropic links.</li>
+<li><strong>Reproduction cadence</strong>: Folktails kits spawn when free beds &gt; 0, ≥2 adults exist, and no hunger/thirst crisis; Iron Teeth kits spawn from staffed/supplied <code>BreedingPod</code> cycles (<code>5 Water + 5 Berries / 5 days</code> verified, exact pod scheduling approximated).</li>
+<li><strong>Wellbeing bonuses</strong>: Approximates colony work-speed multiplier from average wellbeing using the verified wiki curve anchors (<code>WB 0 -&gt; 1.0x</code>, <code>WB 5 -&gt; 1.2x</code>, <code>WB 15 -&gt; 1.6x</code>, <code>WB 70 -&gt; 3.6x</code>).</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../connect-and-play/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Connect &amp; Play">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Connect & Play
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../four-layer-outer-loop/" class="md-footer__link md-footer__link--next" aria-label="Next: Four-layer outer loop">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Four-layer outer loop
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Timberbot API &mdash; Play Timberborn with an AI &middot; Modified fork of <a href="https://github.com/abix-/TimberbornMods">abix-/TimberbornMods</a>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/impuls42/timberbot" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://github.com/abix-/TimberbornMods" target="_blank" rel="noopener" title="Upstream (abix-/TimberbornMods)" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.annotate", "content.tabs.link", "navigation.instant", "navigation.instant.progress", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>

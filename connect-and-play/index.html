@@ -1,0 +1,1767 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Full read/write HTTP API for controlling Timberborn with AI (modified fork of abix-/TimberbornMods)">
+      
+      
+      
+        <link rel="canonical" href="https://impuls42.github.io/timberbot/connect-and-play/">
+      
+      
+        <link rel="prev" href="../remote-access/">
+      
+      
+        <link rel="next" href="../mock-fidelity/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
+    
+    
+      
+        <title>Connect & Play - Timberbot API</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#connect-play-two-machine-timberborn-11-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Timberbot API" class="md-header__button md-logo" aria-label="Timberbot API" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Timberbot API
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Connect & Play
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/impuls42/timberbot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    impuls42/timberbot
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Timberbot API" class="md-nav__button md-logo" aria-label="Timberbot API" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Timberbot API
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/impuls42/timberbot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    impuls42/timberbot
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timberbot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Timberbot Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../websocket-protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebSocket Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../macos-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    macOS Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sdlc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDLC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devenv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../game-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Game build pin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../remote-access/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote access
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connect & Play
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connect & Play
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-install-the-c-mod-on-the-gaming-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Install the C# Mod on the Gaming Machine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1 — Install the C# Mod on the Gaming Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-default-install-recommended-prebuilt-release-zip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Default Install (Recommended): Prebuilt Release ZIP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-maintainer-first-build-on-the-game-machine-build-package-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Maintainer / First Build on the Game Machine (Build, Package &amp; Upload)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-enable-load-a-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Enable &amp; load a save
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-verify-8085-http-and-8086-websocket-on-the-gaming-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Verify :8085 (HTTP) and :8086 (WebSocket) on the Gaming Machine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-expose-the-mod-to-the-grok-bot-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Expose the Mod to the Grok Bot Machine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 3 — Expose the Mod to the Grok Bot Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-recommended-ssh-local-port-forwarding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A (Recommended): SSH Local Port Forwarding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-direct-lan-tailscale-bind-with-mandatory-authtoken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Direct LAN / Tailscale Bind with Mandatory authToken
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-build-wire-timberbot-mcp-stdio-into-grok-bot-cursor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Build &amp; Wire timberbot-mcp (stdio) into Grok Bot / Cursor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 4 — Build &amp; Wire timberbot-mcp (stdio) into Grok Bot / Cursor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cursor-grok-bot-mcp-configuration-mcpjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cursor / Grok Bot MCP configuration (mcp.json)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-read-only-smoke-test-before-any-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Read-Only Smoke Test (Before Any Writes)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-run-the-inner-loop-baseline-or-fast-model-decide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 — Run the Inner Loop (Baseline or Fast-Model decide())
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 6 — Run the Inner Loop (Baseline or Fast-Model decide())">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-the-reference-agent-against-the-live-game" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the reference agent against the live game
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-a-fast-model-policy-offline-before-pointing-it-at-a-real-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing a fast-model policy offline before pointing it at a real save
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-run-outer-loop-evals-analytics-gated-promotion-on-real-traces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7 — Run Outer-Loop Evals, Analytics &amp; Gated Promotion on Real Traces
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 7 — Run Outer-Loop Evals, Analytics &amp; Gated Promotion on Real Traces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-replay-traces-surface-misses-by-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Replay traces &amp; surface misses by layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-harvest-labeled-eval-cases-from-real-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Harvest labeled eval cases from real failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-generate-end-of-run-analytics-interactive-html-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Generate end-of-run analytics &amp; interactive HTML replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-gate-every-new-tactic-or-prompt-tweak-before-live-play" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Gate every new tactic or prompt tweak before live play
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mock-fidelity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mock fidelity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../four-layer-outer-loop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Four-layer outer loop
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unreleased/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-install-the-c-mod-on-the-gaming-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Install the C# Mod on the Gaming Machine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1 — Install the C# Mod on the Gaming Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-default-install-recommended-prebuilt-release-zip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Default Install (Recommended): Prebuilt Release ZIP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-maintainer-first-build-on-the-game-machine-build-package-upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Maintainer / First Build on the Game Machine (Build, Package &amp; Upload)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-enable-load-a-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Enable &amp; load a save
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-verify-8085-http-and-8086-websocket-on-the-gaming-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Verify :8085 (HTTP) and :8086 (WebSocket) on the Gaming Machine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-expose-the-mod-to-the-grok-bot-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Expose the Mod to the Grok Bot Machine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 3 — Expose the Mod to the Grok Bot Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-recommended-ssh-local-port-forwarding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A (Recommended): SSH Local Port Forwarding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-direct-lan-tailscale-bind-with-mandatory-authtoken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Direct LAN / Tailscale Bind with Mandatory authToken
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-build-wire-timberbot-mcp-stdio-into-grok-bot-cursor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Build &amp; Wire timberbot-mcp (stdio) into Grok Bot / Cursor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 4 — Build &amp; Wire timberbot-mcp (stdio) into Grok Bot / Cursor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cursor-grok-bot-mcp-configuration-mcpjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cursor / Grok Bot MCP configuration (mcp.json)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-read-only-smoke-test-before-any-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Read-Only Smoke Test (Before Any Writes)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-run-the-inner-loop-baseline-or-fast-model-decide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 — Run the Inner Loop (Baseline or Fast-Model decide())
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 6 — Run the Inner Loop (Baseline or Fast-Model decide())">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-the-reference-agent-against-the-live-game" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the reference agent against the live game
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing-a-fast-model-policy-offline-before-pointing-it-at-a-real-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing a fast-model policy offline before pointing it at a real save
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-run-outer-loop-evals-analytics-gated-promotion-on-real-traces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7 — Run Outer-Loop Evals, Analytics &amp; Gated Promotion on Real Traces
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 7 — Run Outer-Loop Evals, Analytics &amp; Gated Promotion on Real Traces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-replay-traces-surface-misses-by-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Replay traces &amp; surface misses by layer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-harvest-labeled-eval-cases-from-real-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Harvest labeled eval cases from real failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-generate-end-of-run-analytics-interactive-html-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Generate end-of-run analytics &amp; interactive HTML replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-gate-every-new-tactic-or-prompt-tweak-before-live-play" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Gate every new tactic or prompt tweak before live play
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="connect-play-two-machine-timberborn-11-guide">Connect &amp; Play (Two-Machine Timberborn 1.1 Guide)<a class="headerlink" href="#connect-play-two-machine-timberborn-11-guide" title="Permanent link">&para;</a></h1>
+<p>End-to-end operator guide for running <strong>Timberborn 1.1</strong> on a separate <strong>Gaming Machine</strong> and driving it from a <strong>Grok Bot / Cursor Machine</strong> using the Rust toolkit (<code>timberbot-mcp</code>, <code>timberbot-agent</code>, <code>timberbot-drills</code>) with the full 4-layer inner/outer loop.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─ Gaming Machine (Windows / macOS / Linux) ──────────┐
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  Timberborn 1.1.2.0+ (Unity)                        │
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│    └─ Timberbot C# Mod (compiled against Managed/)  │
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│         ├─ HTTP  127.0.0.1:8085  (reads + writes)   │
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│         ├─ WS    127.0.0.1:8086  (/api/ws events)   │
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│         └─ Lever 127.0.0.1:8080  (optional 1.1 API) │
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>└──────────────────────────▲──────────────────────────┘
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                           │ SSH tunnel (recommended)
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                           │ or LAN/Tailscale + Bearer authToken
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>┌──────────────────────────▼──────────────────────────┐
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│ Grok Bot / Cursor Machine (Linux / macOS)           │
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│  ├─ timberbot-mcp (stdio MCP -&gt; Grok Bot / Cursor)  │
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│  ├─ Inner loop: baseline or fast-model decide()     │
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│  │    └─ logs JSONL traces (real-run.jsonl)         │
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│  └─ Outer loop (timberbot-drills):                  │
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│       ├─ surface-misses / harvest-cases             │
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│       ├─ report -&gt; analytics.json, report.md,       │
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│       │            replay.html                      │
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│       └─ promote -&gt; gates on offline + 10 drills    │
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>└─────────────────────────────────────────────────────┘
+</span></code></pre></div>
+<blockquote>
+<p><strong>Build compatibility note:</strong> <code>timberbot/src/manifest.json</code> pins <code>MinimumGameVersion: 1.1.2.0</code> (<code>mod</code> version <code>0.8.0</code>). Compatibility with newer Steam/GOG patches beyond <code>1.1.2.0</code> is <strong>unverified</strong> until built against that machine's <code>Managed/</code> DLLs.</p>
+</blockquote>
+<hr />
+<h2 id="step-1-install-the-c-mod-on-the-gaming-machine">Step 1 — Install the C# Mod on the Gaming Machine<a class="headerlink" href="#step-1-install-the-c-mod-on-the-gaming-machine" title="Permanent link">&para;</a></h2>
+<h3 id="11-default-install-recommended-prebuilt-release-zip">1.1 Default Install (Recommended): Prebuilt Release ZIP<a class="headerlink" href="#11-default-install-recommended-prebuilt-release-zip" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Download the latest <code>timberbot-mod-&lt;version&gt;.zip</code> from <a href="https://github.com/gabcoyne/timberbot/releases">GitHub Releases</a>.</li>
+<li>Extract the archive into Timberborn's <code>Mods/</code> directory so the resulting layout is <code>Mods/Timberbot/manifest.json</code>, <code>Mods/Timberbot/Timberbot.dll</code>, and <code>Mods/Timberbot/settings.json</code>:</li>
+<li><strong>Windows:</strong> <code>%USERPROFILE%\Documents\Timberborn\Mods\</code></li>
+<li><strong>Linux:</strong> <code>~/.config/unity3d/Mechanistry/Timberborn/Mods/</code></li>
+<li><strong>macOS:</strong> <code>~/Library/Application Support/Mechanistry/Timberborn/Mods/</code></li>
+</ol>
+<blockquote>
+<p>The release ZIP ships <strong>only</strong> Timberbot's own GPL-3.0 artifacts (<code>Timberbot.dll</code>, <code>manifest.json</code>, <code>settings.json</code>, <code>thumbnail.png</code>, <code>LICENSE</code>, <code>docs/</code>). Zero Timberborn, Unity, or Bindito <code>Managed/</code> DLLs are ever packaged.</p>
+</blockquote>
+<h3 id="12-maintainer-first-build-on-the-game-machine-build-package-upload">1.2 Maintainer / First Build on the Game Machine (Build, Package &amp; Upload)<a class="headerlink" href="#12-maintainer-first-build-on-the-game-machine-build-package-upload" title="Permanent link">&para;</a></h3>
+<p>For the first release build (or after updating to a new Timberborn 1.1 patch), run the single-command packaging script on the <strong>Gaming Machine</strong> where Timberborn 1.1 and the .NET SDK are installed (see <a href="../devenv/">Dev Environment</a>).</p>
+<p>Default Timberborn <code>Managed/</code> paths:</p>
+<table>
+<thead>
+<tr>
+<th>OS</th>
+<th>Default Timberborn <code>Managed/</code> path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Windows (Steam)</strong></td>
+<td><code>C:\Program Files (x86)\Steam\steamapps\common\Timberborn\Timberborn_Data\Managed</code> (or <code>C:\Games\Steam\...</code>)</td>
+</tr>
+<tr>
+<td><strong>Linux (Steam)</strong></td>
+<td><code>~/.local/share/Steam/steamapps/common/Timberborn/Timberborn_Data/Managed</code></td>
+</tr>
+<tr>
+<td><strong>macOS (Steam)</strong></td>
+<td><code>~/Library/Application Support/Steam/steamapps/common/Timberborn/Timberborn.app/Contents/Resources/Data/Managed</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Build &amp; package in one command</strong> (compiles <code>Release</code> with <code>-p:GameManagedDir=...</code>, excludes all game <code>Managed/</code> DLLs, audits that <code>Timberbot.dll</code> is the only <code>.dll</code>, and emits <code>dist/timberbot-mod-&lt;version&gt;.zip</code>):</p>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c"># Windows (PowerShell)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">package-mod</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-GameManagedDir</span> <span class="s2">"C:\Program Files (x86)\Steam\steamapps\common\Timberborn\Timberborn_Data\Managed"</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># macOS / Linux</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>./scripts/package-mod.sh<span class="w"> </span>--game-managed-dir<span class="w"> </span><span class="s2">"/path/to/Timberborn/Timberborn_Data/Managed"</span>
+</span></code></pre></div>
+<p><em>(If Timberborn is installed at a default Steam path, you can omit <code>-GameManagedDir</code> / <code>--game-managed-dir</code> and the script auto-detects it.)</em></p>
+<p><strong>Install locally or publish to GitHub Releases:</strong></p>
+<ul>
+<li><strong>Install locally:</strong> extract <code>dist/timberbot-mod-&lt;version&gt;.zip</code> into your <code>Mods/</code> folder above.</li>
+<li><strong>Upload via GitHub CLI (<code>gh</code>):</strong>
+  <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>release<span class="w"> </span>create<span class="w"> </span>v0.8.0<span class="w"> </span>dist/timberbot-mod-0.8.0.zip<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--title<span class="w"> </span><span class="s2">"Timberbot Mod v0.8.0"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--notes<span class="w"> </span><span class="s2">"GPL-3.0 Timberbot C# mod built against Timberborn 1.1 Managed/ DLLs (excludes all game DLLs)."</span>
+</span></code></pre></div></li>
+<li><strong>Upload via GitHub Web UI:</strong> open <strong>Releases → Draft a new release</strong>, tag <code>v0.8.0</code>, and attach <code>dist/timberbot-mod-0.8.0.zip</code>.</li>
+</ul>
+<h3 id="13-enable-load-a-save">1.3 Enable &amp; load a save<a class="headerlink" href="#13-enable-load-a-save" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Launch <strong>Timberborn 1.1</strong>.</li>
+<li>Open <strong>Mods</strong> on the main menu and enable <strong>Timberbot</strong>. Restart if prompted.</li>
+<li>Load or start a colony save (Folktails or Iron Teeth).</li>
+<li>Leave the in-game Timberbot widget <strong>Stopped (<code>ready=false</code>)</strong> while you run initial health checks; press <strong>Launch (<code>ready=true</code>)</strong> once the tunnel/smoke test is confirmed.</li>
+</ol>
+<blockquote>
+<p><code>ready</code> resets to <code>false</code> on every save load — the player explicitly opts in each session.</p>
+</blockquote>
+<hr />
+<h2 id="step-2-verify-8085-http-and-8086-websocket-on-the-gaming-machine">Step 2 — Verify <code>:8085</code> (HTTP) and <code>:8086</code> (WebSocket) on the Gaming Machine<a class="headerlink" href="#step-2-verify-8085-http-and-8086-websocket-on-the-gaming-machine" title="Permanent link">&para;</a></h2>
+<p>Before touching the network, confirm both mod listeners are up locally on the Gaming Machine:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># 1. Liveness (always exempt from the ready gate)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://127.0.0.1:8085/api/ping
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># -&gt; {"status":"ok",...}</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># 2. Ready gate status (false until you click Launch in the in-game widget)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://127.0.0.1:8085/api/ready
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># -&gt; {"ready":false}</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1"># 3. Verify ready gate enforcement (MUST return HTTP 409 before Launch)</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>curl<span class="w"> </span>-i<span class="w"> </span>http://127.0.0.1:8085/api/summary
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># -&gt; HTTP/1.1 409 Conflict  {"error":"game_not_ready",...}</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># 4. Click Launch in the in-game Timberbot widget, then re-test summary:</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://127.0.0.1:8085/api/summary<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-c<span class="w"> </span><span class="m">400</span>
+</span></code></pre></div>
+<p>Verify the WebSocket listener on <code>:8086</code> (not ready-gated; stays open across Launch/Stop toggles):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Quick HTTP upgrade handshake probe (expects 101 Switching Protocols or WS frame via websocat/python)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>curl<span class="w"> </span>-i<span class="w"> </span>-N<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Connection: Upgrade"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Upgrade: websocket"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Sec-WebSocket-Version: 13"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=="</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span>http://127.0.0.1:8086/api/ws
+</span></code></pre></div>
+<hr />
+<h2 id="step-3-expose-the-mod-to-the-grok-bot-machine">Step 3 — Expose the Mod to the Grok Bot Machine<a class="headerlink" href="#step-3-expose-the-mod-to-the-grok-bot-machine" title="Permanent link">&para;</a></h2>
+<p>Choose <strong>one</strong> transport option (full security details in <a href="../remote-access/">Remote Access</a>).</p>
+<h3 id="option-a-recommended-ssh-local-port-forwarding">Option A (Recommended): SSH Local Port Forwarding<a class="headerlink" href="#option-a-recommended-ssh-local-port-forwarding" title="Permanent link">&para;</a></h3>
+<p>Keep stock <code>settings.json</code> on the Gaming Machine (<code>"listenAddress": "127.0.0.1"</code>, <code>"authToken": ""</code>). Run on the <strong>Grok Bot Machine</strong>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ssh<span class="w"> </span>-N<span class="w"> </span>-o<span class="w"> </span><span class="nv">ServerAliveInterval</span><span class="o">=</span><span class="m">30</span><span class="w"> </span>-o<span class="w"> </span><span class="nv">ServerAliveCountMax</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>-L<span class="w"> </span><span class="m">8085</span>:127.0.0.1:8085<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>-L<span class="w"> </span><span class="m">8086</span>:127.0.0.1:8086<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>-L<span class="w"> </span><span class="m">8080</span>:127.0.0.1:8080<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>&lt;game-user&gt;@&lt;game-host&gt;
+</span></code></pre></div>
+<p>From the Grok Bot Machine, the remote game now appears at <code>127.0.0.1:8085</code> (HTTP), <code>127.0.0.1:8086</code> (WS), and <code>127.0.0.1:8080</code> (optional official Timberborn 1.1 HTTP Lever/Adapter API).</p>
+<h3 id="option-b-direct-lan-tailscale-bind-with-mandatory-authtoken">Option B: Direct LAN / Tailscale Bind with Mandatory <code>authToken</code><a class="headerlink" href="#option-b-direct-lan-tailscale-bind-with-mandatory-authtoken" title="Permanent link">&para;</a></h3>
+<p>If SSH is unavailable, edit <code>Mods/Timberbot/settings.json</code> on the Gaming Machine:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"httpPort"</span><span class="p">:</span><span class="w"> </span><span class="mi">8085</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"wsPort"</span><span class="p">:</span><span class="w"> </span><span class="mi">8086</span><span class="p">,</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">"listenAddress"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.0.0.0"</span><span class="p">,</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">"authToken"</span><span class="p">:</span><span class="w"> </span><span class="s2">"REPLACE_WITH_64_HEX_RANDOM_SECRET"</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li>Generate a token with <code>openssl rand -hex 32</code>.</li>
+<li><strong>Fail-closed guard:</strong> the mod refuses to start if <code>listenAddress</code> is non-loopback and <code>authToken</code> is empty.</li>
+<li>Pass <code>Authorization: Bearer &lt;token&gt;</code> on every HTTP call, and either the same header or <code>?token=&lt;token&gt;</code> on WebSocket upgrades (<code>ws://&lt;game-host&gt;:8086/api/ws?token=&lt;token&gt;</code>).</li>
+<li>Keep the firewall scoped strictly to your LAN or Tailscale interface — never expose <code>:8085</code>/<code>:8086</code> to the public internet.</li>
+</ul>
+<p>Verify connectivity from the <strong>Grok Bot Machine</strong>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Option A (SSH tunnel):</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://127.0.0.1:8085/api/ping
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Option B (LAN / Tailscale with authToken):</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>curl<span class="w"> </span>-sf<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$TBOT_AUTH_TOKEN</span><span class="s2">"</span><span class="w"> </span>http://&lt;game-host&gt;:8085/api/ping
+</span></code></pre></div>
+<hr />
+<h2 id="step-4-build-wire-timberbot-mcp-stdio-into-grok-bot-cursor">Step 4 — Build &amp; Wire <code>timberbot-mcp</code> (stdio) into Grok Bot / Cursor<a class="headerlink" href="#step-4-build-wire-timberbot-mcp-stdio-into-grok-bot-cursor" title="Permanent link">&para;</a></h2>
+<p>On the <strong>Grok Bot Machine</strong>, build the Rust binaries once in release mode (requires Rust 1.88+; zero game DLLs needed):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">cd</span><span class="w"> </span>rust
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>-p<span class="w"> </span>timberbot-mcp<span class="w"> </span>-p<span class="w"> </span>timberbot-agent<span class="w"> </span>-p<span class="w"> </span>timberbot-drills
+</span></code></pre></div>
+<p>The standalone binaries are produced at:</p>
+<ul>
+<li><code>rust/target/release/timberbot-mcp</code> (36 stdio MCP tools: mod read/write, official <code>:8080</code> Levers/Adapters, read-only <code>.timber</code> save inspector)</li>
+<li><code>rust/target/release/timberbot-agent</code> (pause-observe-plan-act-verify-unpause reference bot)</li>
+<li><code>rust/target/release/timberbot-drills</code> (Layer 3/4 offline evals, 10 staged drills, outer-loop miss surfacing &amp; case harvesting, dual promotion gate, JSON/Markdown/HTML analytics &amp; replay)</li>
+</ul>
+<h3 id="cursor-grok-bot-mcp-configuration-mcpjson">Cursor / Grok Bot MCP configuration (<code>mcp.json</code>)<a class="headerlink" href="#cursor-grok-bot-mcp-configuration-mcpjson" title="Permanent link">&para;</a></h3>
+<p>Add <code>timberbot</code> to your Cursor <code>~/.cursor/mcp.json</code> (or Grok Bot MCP config). Remember: the C# mod does <strong>not</strong> serve <code>/mcp</code> — <code>timberbot-mcp</code> bridges stdio MCP directly to <code>:8085</code> / <code>:8086</code> / <code>:8080</code>:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">"timberbot"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">      </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/abs/path/to/timberbot/rust/target/release/timberbot-mcp"</span><span class="p">,</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">"args"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">        </span><span class="s2">"--host"</span><span class="p">,</span><span class="w"> </span><span class="s2">"127.0.0.1"</span><span class="p">,</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">        </span><span class="s2">"--port"</span><span class="p">,</span><span class="w"> </span><span class="s2">"8085"</span><span class="p">,</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">        </span><span class="s2">"--ws-port"</span><span class="p">,</span><span class="w"> </span><span class="s2">"8086"</span><span class="p">,</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">        </span><span class="s2">"--save-root"</span><span class="p">,</span><span class="w"> </span><span class="s2">"/abs/path/to/timberbot/scenarios"</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">      </span><span class="p">],</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">      </span><span class="nt">"env"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">        </span><span class="nt">"TBOT_AUTH_TOKEN"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li>For <strong>Option B (LAN / Tailscale)</strong>, replace <code>"127.0.0.1"</code> with <code>"&lt;game-host&gt;"</code> and set <code>TBOT_AUTH_TOKEN</code> to match <code>settings.json</code> (all supported env vars: <code>TBOT_HOST</code>, <code>TBOT_PORT</code>, <code>TBOT_WS_PORT</code>, <code>TBOT_AUTH_TOKEN</code>, <code>TIMBERBORN_LEVER_URL</code>, <code>TIMBERBORN_SAVE_ROOT</code>).</li>
+</ul>
+<hr />
+<h2 id="step-5-read-only-smoke-test-before-any-writes">Step 5 — Read-Only Smoke Test (Before Any Writes)<a class="headerlink" href="#step-5-read-only-smoke-test-before-any-writes" title="Permanent link">&para;</a></h2>
+<p>Before letting any agent place buildings or pause workplaces, verify read-only visibility from the Grok Bot Machine:</p>
+<ol>
+<li>Confirm <code>ready</code> is <code>true</code> (press <strong>Launch</strong> in-game):
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>-sf<span class="w"> </span>http://127.0.0.1:8085/api/ready
+</span></code></pre></div></li>
+<li>Verify core Layer 1 read endpoints return valid JSON without mutating the save:
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">for</span><span class="w"> </span>ep<span class="w"> </span><span class="k">in</span><span class="w"> </span>summary<span class="w"> </span>weather<span class="w"> </span>resources<span class="w"> </span>science<span class="w"> </span>workhours<span class="w"> </span>power<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"=== /api/</span><span class="nv">$ep</span><span class="s2"> ==="</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>curl<span class="w"> </span>-sf<span class="w"> </span><span class="s2">"http://127.0.0.1:8085/api/</span><span class="nv">$ep</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-c<span class="w"> </span><span class="m">240</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nb">echo</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">done</span>
+</span></code></pre></div></li>
+<li>In Grok Bot / Cursor (via <code>timberbot-mcp</code>), call <strong>read-only</strong> MCP tools first:</li>
+<li><code>timberbot_ping</code></li>
+<li><code>timberbot_agent_state</code> (confirms <code>ready: true</code>, <code>mode</code>, <code>goal</code>)</li>
+<li><code>timberbot_summary</code></li>
+<li><code>timberbot_weather</code></li>
+<li><code>timberbot_resources</code></li>
+<li><code>timberbot_buildings</code> (<code>limit: 20</code>)</li>
+<li><code>timberbot_alerts</code> (and optionally <code>timberbot_beavers</code>, <code>timberbot_science</code>, <code>timberbot_tiles</code>)</li>
+<li>Pause the game (<code>speed=0</code>) or save a backup <code>.timber</code> archive before starting autonomous writes.</li>
+</ol>
+<hr />
+<h2 id="step-6-run-the-inner-loop-baseline-or-fast-model-decide">Step 6 — Run the Inner Loop (Baseline or Fast-Model <code>decide()</code>)<a class="headerlink" href="#step-6-run-the-inner-loop-baseline-or-fast-model-decide" title="Permanent link">&para;</a></h2>
+<p>Timberbot uses Ryan Perry's 4-layer inner/outer split (see <a href="../four-layer-outer-loop/">Four-Layer Outer Loop</a>):</p>
+<ul>
+<li><strong>Layer 1 (<code>timberbot-state</code>):</strong> Deterministic <code>ModSnapshot::fetch</code> → <code>ColonyState</code> (water/food runways, upstream vs intake contamination lag, builder queue ETAs, unreachable sites, disconnected power networks, wellbeing).</li>
+<li><strong>Layer 2 (<code>timberbot-tactics</code>):</strong> Faction-specific 12-tactic catalogue + <code>decide_with_backend()</code>:</li>
+<li><strong>Deterministic baseline</strong> (<code>PolicyBackend::DeterministicBaseline</code>): zero-latency pure Rust selector.</li>
+<li><strong>Fast-model / Agent SDK backend</strong> (<code>PolicyBackend::ModelBacked</code>): sends <code>ColonyState::to_prompt_summary()</code> + <code>available_catalogue</code> to any OpenAI-compatible <code>/v1/chat/completions</code> endpoint, validates the strict JSON response against enabled tactics, checks latency/staleness (<code>--llm-stale-ms</code>, default <code>1200 ms</code>), and deterministically falls back to the baseline on any error, hallucination, disabled tactic, or stale reply.</li>
+<li><strong>Layer 3 (<code>timberbot-eval</code>):</strong> Logs every tick as a <code>DecisionTrace</code> JSONL row (<code>real-run.jsonl</code>).</li>
+</ul>
+<h3 id="running-the-reference-agent-against-the-live-game">Running the reference agent against the live game<a class="headerlink" href="#running-the-reference-agent-against-the-live-game" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Dry-run / short burst first (4 decision cycles, pauses during decisions)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>./rust/target/release/timberbot-agent<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span>--port<span class="w"> </span><span class="m">8085</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span>--ws-port<span class="w"> </span><span class="m">8086</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span>--cycles<span class="w"> </span><span class="m">4</span>
+</span></code></pre></div>
+<h3 id="testing-a-fast-model-policy-offline-before-pointing-it-at-a-real-save">Testing a fast-model policy offline before pointing it at a real save<a class="headerlink" href="#testing-a-fast-model-policy-offline-before-pointing-it-at-a-real-save" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TIMBERBOT_LLM_URL</span><span class="o">=</span><span class="s2">"https://api.x.ai/v1/chat/completions"</span><span class="w">   </span><span class="c1"># or any OpenAI-compatible fast model / Agent SDK gateway</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TIMBERBOT_LLM_MODEL</span><span class="o">=</span><span class="s2">"grok-3-mini"</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TIMBERBOT_LLM_API_KEY</span><span class="o">=</span><span class="s2">"YOUR_KEY"</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># Evaluate the fast model on all 18 labeled offline cases (no live game)</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>./rust/target/release/timberbot-drills<span class="w"> </span>offline<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span>--cases<span class="w"> </span>scenarios/eval-cases.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span>--llm-url<span class="w"> </span><span class="s2">"</span><span class="nv">$TIMBERBOT_LLM_URL</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">  </span>--llm-model<span class="w"> </span><span class="s2">"</span><span class="nv">$TIMBERBOT_LLM_MODEL</span><span class="s2">"</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="c1"># Run the 10 staged mock drills with the fast model and capture JSONL traces</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>./rust/target/release/timberbot-drills<span class="w"> </span>drills<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">  </span>--trace-out<span class="w"> </span>/tmp/model-drills.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">  </span>--llm-url<span class="w"> </span><span class="s2">"</span><span class="nv">$TIMBERBOT_LLM_URL</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="w">  </span>--llm-model<span class="w"> </span><span class="s2">"</span><span class="nv">$TIMBERBOT_LLM_MODEL</span><span class="s2">"</span>
+</span></code></pre></div>
+<hr />
+<h2 id="step-7-run-outer-loop-evals-analytics-gated-promotion-on-real-traces">Step 7 — Run Outer-Loop Evals, Analytics &amp; Gated Promotion on Real Traces<a class="headerlink" href="#step-7-run-outer-loop-evals-analytics-gated-promotion-on-real-traces" title="Permanent link">&para;</a></h2>
+<p>After a live session (or staged drill run) writes <code>real-run.jsonl</code>, run the outer loop offline on the Grok Bot Machine — <strong>zero live game required</strong>:</p>
+<h3 id="71-replay-traces-surface-misses-by-layer">7.1 Replay traces &amp; surface misses by layer<a class="headerlink" href="#71-replay-traces-surface-misses-by-layer" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Measure policy drift, state bugs, playbook failures, and stale ticks</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>./rust/target/release/timberbot-drills<span class="w"> </span>replay<span class="w"> </span>--traces<span class="w"> </span>real-run.jsonl
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Group every failure/drift into Ryan Perry's 4 layers:</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="c1">#   StateBug | MissingCatalogueTactic | PickError | PlaybookBug</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>./rust/target/release/timberbot-drills<span class="w"> </span>surface-misses<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span>--traces<span class="w"> </span>real-run.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span>--cases<span class="w"> </span>scenarios/eval-cases.json
+</span></code></pre></div>
+<h3 id="72-harvest-labeled-eval-cases-from-real-failures">7.2 Harvest labeled eval cases from real failures<a class="headerlink" href="#72-harvest-labeled-eval-cases-from-real-failures" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>./rust/target/release/timberbot-drills<span class="w"> </span>harvest-cases<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span>--traces<span class="w"> </span>real-run.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>--existing-cases<span class="w"> </span>scenarios/eval-cases.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span>--out<span class="w"> </span>/tmp/harvested-cases.json
+</span></code></pre></div>
+<p>Review <code>/tmp/harvested-cases.json</code>, confirm each <code>expected_tactic</code>, and merge the new cases into <code>scenarios/eval-cases.json</code> so that failure class can never silently regress.</p>
+<h3 id="73-generate-end-of-run-analytics-interactive-html-replay">7.3 Generate end-of-run analytics &amp; interactive HTML replay<a class="headerlink" href="#73-generate-end-of-run-analytics-interactive-html-replay" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>./rust/target/release/timberbot-drills<span class="w"> </span>report<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>--traces<span class="w"> </span>real-run.jsonl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>--out-dir<span class="w"> </span>reports/real-run
+</span></code></pre></div>
+<p>This writes three self-contained artifacts into <code>reports/real-run/</code>:</p>
+<ul>
+<li><code>analytics.json</code> — full structured metrics (tactic distribution, latency min/p50/p95/max/mean, staleness &amp; fallback rates, population/water/food/wellbeing timeline, failure-layer attribution, and replay frames)</li>
+<li><code>report.md</code> — concise Markdown summary ready to paste into PRs or notes</li>
+<li><code>replay.html</code> — self-contained interactive browser dashboard (inline SVG sparklines + Play/Pause/Scrubber frame inspector, zero external CDNs)</li>
+</ul>
+<h3 id="74-gate-every-new-tactic-or-prompt-tweak-before-live-play">7.4 Gate every new tactic or prompt tweak before live play<a class="headerlink" href="#74-gate-every-new-tactic-or-prompt-tweak-before-live-play" title="Permanent link">&para;</a></h3>
+<p>Save a baseline report before editing tactics, then run <code>promote</code> after your change. Promotion succeeds (<code>exit 0</code>) <strong>only</strong> when <strong>both</strong> Layer 3 offline evals (100% pass + zero regressions vs baseline) <strong>and</strong> all 10 Layer 4 staged drills pass with zero deaths and zero playbook failures:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># 1. Capture baseline before editing</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>./rust/target/release/timberbot-drills<span class="w"> </span>offline<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span>--cases<span class="w"> </span>scenarios/eval-cases.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span>--out-report<span class="w"> </span>/tmp/baseline-eval.json
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="c1"># 2. Edit tactic/state/playbook/prompt, then run the dual promotion gate</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>./rust/target/release/timberbot-drills<span class="w"> </span>promote<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span>--cases<span class="w"> </span>scenarios/eval-cases.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">  </span>--baseline-report<span class="w"> </span>/tmp/baseline-eval.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">  </span>--trace-out<span class="w"> </span>/tmp/promoted-traces.jsonl
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../remote-access/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Remote access">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Remote access
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../mock-fidelity/" class="md-footer__link md-footer__link--next" aria-label="Next: Mock fidelity">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Mock fidelity
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Timberbot API &mdash; Play Timberborn with an AI &middot; Modified fork of <a href="https://github.com/abix-/TimberbornMods">abix-/TimberbornMods</a>
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/impuls42/timberbot" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://github.com/abix-/TimberbornMods" target="_blank" rel="noopener" title="Upstream (abix-/TimberbornMods)" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M202.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M496 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.annotate", "content.tabs.link", "navigation.instant", "navigation.instant.progress", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>
