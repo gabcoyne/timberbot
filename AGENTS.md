@@ -166,6 +166,7 @@ To inspect the API surface, decompile the DLLs locally with `ilspycmd` (see `doc
 
 ## Game Version Compatibility
 
+- **Pinned game version:** the manifest minimum **1.1.2.0** is the only build this repository pins. `Timberbot.csproj` and `docs/devenv.md` do not record a newer patch or a Steam build id. **Latest-build compatibility is unverified.** See [`docs/game-build.md`](docs/game-build.md).
 - **Minimum game version:** 1.1.2.0 (set in `manifest.json`). 1.1 changed `IBlockObjectPlacer.Place`, `Relay` inputs and `GoodCarrier`, so builds against 1.1 DLLs no longer load on 1.0.x.
 - **Automation system:** Introduced in Timberborn 1.0 (the full release, not an early access update). All automation buildings (sensors, relays, memory, timers, levers, gates) and the wiring system (`Automator`/`Automatable`/`AutomatorConnection`) are 1.0 features.
 - **Modding framework:** The game uses `BaseComponent` (no longer inherits from MonoBehaviour as of 1.0). Components must implement interfaces like `IAwakableComponent` for lifecycle hooks.
@@ -182,4 +183,4 @@ See `design/automation-plan.md` for the full implementation plan with decompiled
 
 - Game automation guide: https://timberborn.org/articles/automation-guide
 - Official modding tools: https://github.com/mechanistry/timberborn-modding/wiki
-- Timberborn uses Unity Engine 6000.3.6f1 as of 1.0
+- Timberborn uses Unity Engine 6000.3.6f1 as of 1.0. That note is not a pin of the 1.1.2 build. See [`docs/game-build.md`](docs/game-build.md).

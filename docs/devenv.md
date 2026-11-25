@@ -78,9 +78,11 @@ The `requests` library is used for HTTP calls to the mod API. `toons` is used fo
 
 ---
 
-## Required: Timberborn Game (v1.0+)
+## Required: Timberborn Game (manifest minimum 1.1.2.0)
 
 The C# mod compiles against game DLLs via `Publicize="true"` references. **The game must be installed** on the build machine so `dotnet build` can find the assemblies.
+
+The pin this repository actually makes is `MinimumGameVersion` **1.1.2.0** in `timberbot/src/manifest.json`. `Timberbot.csproj` does not record a newer patch, a Steam build id, or a Unity version for 1.1. **Compatibility with the latest Timberborn build is unverified.** Read [Game build pin](game-build.md) before treating a local compile as proof that the mod matches current Steam or GOG. The "v1.0+" wording that used to head this section was looser than the manifest and is not the pin.
 
 ### Game DLL Location
 
