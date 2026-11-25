@@ -55,6 +55,10 @@ Timberbot gives Claude, Codex, ChatGPT, or your own scripts complete access to a
 
     Source-cited verification matrix for every Timberborn 1.1 mechanic and API shape in the offline mock.
 
+- **[Four-layer outer loop](four-layer-outer-loop.md)**
+
+    Typed state, faction tactic catalogue, JSONL trace evals, staged drills, and the local Grok Bot loop.
+
 </div>
 
 ---

@@ -1458,6 +1458,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "timberbot-drills"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde",
+ "serde_json",
+ "timberbot-client",
+ "timberbot-eval",
+ "timberbot-mock",
+ "timberbot-protocol",
+ "timberbot-state",
+ "timberbot-tactics",
+ "tokio",
+]
+
+[[package]]
 name = "timberbot-eval"
 version = "0.1.0"
 dependencies = [
