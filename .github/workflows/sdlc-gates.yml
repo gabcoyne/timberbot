@@ -1,0 +1,32 @@
+name: SDLC gates
+
+# Recurring mechanical gates from scripts/check_sdlc_gates.py.
+# A green run is not the independent PASS verdict. See docs/sdlc.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sdlc-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install mkdocs
+        run: pip install mkdocs-material
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Run SDLC gates
+        run: python3 scripts/check_sdlc_gates.py
