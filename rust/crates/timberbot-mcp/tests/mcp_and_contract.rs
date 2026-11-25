@@ -229,7 +229,7 @@ async fn mcp_server_exercises_mod_lever_and_save_tools() {
     )
     .unwrap();
     let tools = list_resp["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 35);
+    assert_eq!(tools.len(), 36);
 
     // 3. Mod read/write via MCP
     let summary_resp: Value = serde_json::from_str(

@@ -10,6 +10,50 @@ pub struct Observation {
 }
 
 impl Observation {
+    pub fn is_iron_teeth(&self) -> bool {
+        self.summary.faction.eq_ignore_ascii_case("IronTeeth")
+    }
+
+    pub fn faction_suffix(&self) -> &'static str {
+        if self.is_iron_teeth() {
+            "IronTeeth"
+        } else {
+            "Folktails"
+        }
+    }
+
+    pub fn pump_prefab(&self) -> &'static str {
+        if self.is_iron_teeth() {
+            "DeepWaterPump.IronTeeth"
+        } else {
+            "WaterPump.Folktails"
+        }
+    }
+
+    pub fn farm_prefab(&self) -> &'static str {
+        if self.is_iron_teeth() {
+            "FarmHouse.IronTeeth"
+        } else {
+            "EfficientFarmHouse.Folktails"
+        }
+    }
+
+    pub fn housing_prefab(&self) -> &'static str {
+        if self.is_iron_teeth() {
+            "Barrack.IronTeeth"
+        } else {
+            "Lodge.Folktails"
+        }
+    }
+
+    pub fn primary_crop(&self) -> &'static str {
+        if self.is_iron_teeth() {
+            "Kohlrabi"
+        } else {
+            "Carrot"
+        }
+    }
+
     pub fn total_beavers(&self) -> u32 {
         self.summary
             .districts
@@ -28,6 +72,8 @@ impl Observation {
 
     pub fn total_food(&self) -> i64 {
         self.resource("Carrot")
+            + self.resource("Kohlrabi")
+            + self.resource("FermentedCassava")
             + self.resource("Berries")
             + self.resource("GrilledPotato")
             + self.resource("Bread")
@@ -56,6 +102,19 @@ impl Observation {
             .as_ref()
             .map(|ts| ts.iter().map(|t| t.badwater).fold(0.0_f64, f64::max))
             .unwrap_or(0.0)
+    }
+
+    pub fn max_river_depth(&self) -> f64 {
+        self.tiles
+            .tiles
+            .as_ref()
+            .map(|ts| ts.iter().map(|t| t.water).fold(0.0_f64, f64::max))
+            .unwrap_or(0.0)
+    }
+
+    /// Estimate upcoming hazardous days so storage & food buffers scale with difficulty.
+    pub fn planned_hazard_days(&self) -> i64 {
+        (self.summary.weather.hazardous_weather_duration as i64).clamp(4, 30)
     }
 }
 
@@ -109,34 +168,36 @@ pub enum Action {
     },
 }
 
-/// Run the four deterministic managers (water, food, logs, housing) in survival-priority order.
+/// Run the four deterministic managers (water, food, logs, housing/population) in survival-priority order,
+/// tracking a shared log budget so one decision cycle never overspends colony logs.
 pub fn plan_actions(obs: &Observation) -> Vec<Action> {
     let mut actions = Vec::new();
-    water_manager(obs, &mut actions);
-    food_manager(obs, &mut actions);
+    let mut log_budget = obs.resource("Log");
+    water_manager(obs, &mut log_budget, &mut actions);
+    food_manager(obs, &mut log_budget, &mut actions);
     logs_manager(obs, &mut actions);
-    housing_manager(obs, &mut actions);
+    housing_manager(obs, &mut log_budget, &mut actions);
     actions
 }
 
-/// Deterministic water manager:
-/// - Raises floodgates before/during droughts to hold reservoir depth, and raises/diverts on badtide.
-/// - Pauses water pumps if river contamination spikes, otherwise keeps them unpaused & VeryHigh priority.
-/// - Builds an extra SmallTank or WaterPump when water per beaver falls below safety margins.
-pub fn water_manager(obs: &Observation, out: &mut Vec<Action>) {
+/// Deterministic water manager (Folktails & Iron Teeth, Easy/Normal/Hard):
+/// - Raises floodgates before/during droughts and badtides (verified direction: raising blocks flow).
+/// - Pauses water pumps if river contamination >= 0.30, otherwise keeps them unpaused & VeryHigh priority.
+/// - Scales SmallTank storage and WaterPump / DeepWaterPump count to cover `planned_hazard_days`.
+pub fn water_manager(obs: &Observation, log_budget: &mut i64, out: &mut Vec<Action>) {
     let pop = obs.total_beavers().max(1) as i64;
     let water = obs.resource("Water");
-    let logs = obs.resource("Log");
+    let hazard_days = obs.planned_hazard_days();
     let hazard_soon = obs.summary.weather.is_hazardous || obs.days_until_hazard() <= 3;
     let contaminated = obs.max_river_contamination() >= 0.3;
 
-    // 1. Floodgate height control
+    // 1. Floodgate height control (verified: height 0 = open, raising blocks/retains flow)
     for b in &obs.buildings {
         if b.finished == 1 && b.floodgate == Some(1) {
             let max_h = b.max_height.unwrap_or(1.0);
             let cur_h = b.height.unwrap_or(0.0);
             let target_h = if hazard_soon || contaminated {
-                (max_h * 0.75).min(max_h)
+                (max_h * 0.75).max(1.0).min(max_h)
             } else {
                 0.5_f64.min(max_h)
             };
@@ -147,7 +208,7 @@ pub fn water_manager(obs: &Observation, out: &mut Vec<Action>) {
                     reason: if contaminated {
                         "raise floodgate to block contaminated river inflow".to_string()
                     } else if hazard_soon {
-                        "raise floodgate to retain reservoir water for drought".to_string()
+                        "raise floodgate to retain reservoir water for hazard".to_string()
                     } else {
                         "restore temperate floodgate height".to_string()
                     },
@@ -156,7 +217,7 @@ pub fn water_manager(obs: &Observation, out: &mut Vec<Action>) {
         }
     }
 
-    // 2. WaterPump staffing / pause on contamination
+    // 2. WaterPump / DeepWaterPump staffing & badwater pause
     let pumps: Vec<&Building> = obs
         .buildings
         .iter()
@@ -198,36 +259,54 @@ pub fn water_manager(obs: &Observation, out: &mut Vec<Action>) {
         }
     }
 
-    // 3. Expand water storage or pumping if low buffer and logs allow
-    let desired_water = pop * 12;
-    let tanks = obs
+    // 3. Scale storage tanks to cover verified 2.12 water/beaver/day across full hazard duration
+    let desired_water = pop * ((hazard_days * 3).clamp(12, 72));
+    let tank_cap: i64 = obs
         .buildings
         .iter()
         .filter(|b| b.name.contains("Tank"))
-        .count();
+        .map(|b| b.capacity.unwrap_or(30))
+        .sum();
+    let total_water_cap = 300 + tank_cap;
     let unfinished_tanks = obs
         .buildings
         .iter()
         .filter(|b| b.name.contains("Tank") && b.finished == 0)
         .count();
 
-    if (water < desired_water || hazard_soon) && tanks < 3 && unfinished_tanks == 0 && logs >= 12 {
+    let need_more_cap = total_water_cap < desired_water;
+    if (need_more_cap || (water < pop * 12 && tank_cap < 90))
+        && unfinished_tanks == 0
+        && *log_budget >= 15
+    {
+        *log_budget -= 15;
         out.push(Action::FindAndPlace {
-            prefab: "SmallTank.Folktails".to_string(),
-            reason: "add water storage buffer before/during drought".to_string(),
+            prefab: format!("SmallTank.{}", obs.faction_suffix()),
+            reason: format!(
+                "add SmallTank (cap {total_water_cap} < target {desired_water} for {hazard_days}d hazard)"
+            ),
         });
     }
 
+    // 4. Scale pumps so temperate window can refill entire tank bank before next hazard
+    let target_pumps = if hazard_days >= 10 || pop >= 14 { 3 } else { 2 };
     let unfinished_pumps = pumps.iter().filter(|b| b.finished == 0).count();
-    if pumps.len() < 2 && unfinished_pumps == 0 && water < pop * 8 && logs >= 18 {
+    if pumps.len() < target_pumps
+        && unfinished_pumps == 0
+        && (water < desired_water || pumps.is_empty())
+        && *log_budget >= 12
+    {
+        *log_budget -= 12;
         out.push(Action::FindAndPlace {
-            prefab: "WaterPump.Folktails".to_string(),
-            reason: "add second WaterPump to recover water buffer".to_string(),
+            prefab: obs.pump_prefab().to_string(),
+            reason: "add WaterPump to refill reserves within temperate window".to_string(),
         });
     }
 
-    // 4. Extend work hours slightly during an active hazard if reserves are tight
-    let target_hours = if hazard_soon && (water < pop * 10 || obs.total_food() < pop * 10) {
+    // 5. Work hours: 18h baseline, 20h during hazard or low reserves (never 24h)
+    let target_hours = if (hazard_soon || water < desired_water / 2 || obs.total_food() < pop * 12)
+        && obs.max_river_depth() > 0.05
+    {
         20
     } else {
         18
@@ -240,26 +319,32 @@ pub fn water_manager(obs: &Observation, out: &mut Vec<Action>) {
     }
 }
 
-/// Deterministic food manager:
-/// - Keeps Farmhouses and GathererFlags unpaused and prioritized when food is tight.
-/// - Plants additional Carrots if crop count is low.
-/// - Places a GathererFlag (0 log cost) if food is critical and none exist.
-pub fn food_manager(obs: &Observation, out: &mut Vec<Action>) {
+/// Deterministic food manager (Folktails & Iron Teeth):
+/// - Keeps FarmHouse / EfficientFarmHouse / GathererFlag unpaused and prioritized.
+/// - Plants faction-appropriate staple crop (`Carrot` for Folktails, `Kohlrabi` for Iron Teeth).
+/// - Scales planted tiles to cover verified 2.67 food/beaver/day + drought reserve buffer.
+pub fn food_manager(obs: &Observation, log_budget: &mut i64, out: &mut Vec<Action>) {
     let pop = obs.total_beavers().max(1) as i64;
     let food = obs.total_food();
-    let food_critical = food < pop * 8;
+    let hazard_days = obs.planned_hazard_days();
+    let desired_food = pop * ((hazard_days * 3).clamp(14, 75));
+    let food_critical = food < pop * 10 || food < desired_food / 2;
 
     let mut farmhouses = 0usize;
+    let mut unfinished_farms = 0usize;
     let mut gatherers = 0usize;
 
     for b in &obs.buildings {
-        if b.name.contains("Farmhouse") {
+        if b.name.contains("Farmhouse") || b.name.contains("FarmHouse") {
             farmhouses += 1;
+            if b.finished == 0 {
+                unfinished_farms += 1;
+            }
             if b.paused == 1 {
                 out.push(Action::PauseBuilding {
                     id: b.id,
                     paused: false,
-                    reason: "unpause Farmhouse".to_string(),
+                    reason: "unpause FarmHouse".to_string(),
                 });
             }
             let target_prio = if food_critical {
@@ -271,7 +356,7 @@ pub fn food_manager(obs: &Observation, out: &mut Vec<Action>) {
                 out.push(Action::SetPriority {
                     id: b.id,
                     priority: target_prio,
-                    reason: "prioritize Farmhouse food production".to_string(),
+                    reason: "prioritize FarmHouse food production".to_string(),
                 });
             }
             let max_w = b.max_workers.unwrap_or(2);
@@ -279,23 +364,28 @@ pub fn food_manager(obs: &Observation, out: &mut Vec<Action>) {
                 out.push(Action::SetWorkers {
                     id: b.id,
                     count: max_w,
-                    reason: "fully staff Farmhouse".to_string(),
+                    reason: "fully staff FarmHouse".to_string(),
                 });
             }
         } else if b.name.contains("GathererFlag") {
             gatherers += 1;
-            if food_critical && b.paused == 1 {
+            if (food_critical || obs.is_iron_teeth()) && b.paused == 1 {
                 out.push(Action::PauseBuilding {
                     id: b.id,
                     paused: false,
-                    reason: "unpause GathererFlag during food shortage".to_string(),
+                    reason: "unpause GathererFlag for berry supply".to_string(),
                 });
             }
-            if food_critical && b.workplace_priority != Some(Priority::VeryHigh) {
+            let target_prio = if food_critical {
+                Priority::VeryHigh
+            } else {
+                Priority::High
+            };
+            if b.workplace_priority != Some(target_prio) {
                 out.push(Action::SetPriority {
                     id: b.id,
-                    priority: Priority::VeryHigh,
-                    reason: "boost GathererFlag priority during food crisis".to_string(),
+                    priority: target_prio,
+                    reason: "keep GathererFlag prioritized for food/breeding berries".to_string(),
                 });
             }
         }
@@ -303,40 +393,55 @@ pub fn food_manager(obs: &Observation, out: &mut Vec<Action>) {
 
     if food_critical && gatherers == 0 && !obs.summary.food_clusters.is_empty() {
         out.push(Action::FindAndPlace {
-            prefab: "GathererFlag.Folktails".to_string(),
+            prefab: format!("GathererFlag.{}", obs.faction_suffix()),
             reason: "place GathererFlag to harvest berries during food crisis".to_string(),
         });
     }
 
-    if farmhouses == 0 && obs.resource("Log") >= 20 {
+    let target_farms = if hazard_days >= 10 || pop >= 16 { 2 } else { 1 };
+    if farmhouses < target_farms && unfinished_farms == 0 && *log_budget >= 25 {
+        *log_budget -= 25;
         out.push(Action::FindAndPlace {
-            prefab: "Farmhouse.Folktails".to_string(),
-            reason: "build Farmhouse for sustainable food".to_string(),
+            prefab: obs.farm_prefab().to_string(),
+            reason: "build FarmHouse for sustainable food surplus".to_string(),
         });
     }
 
+    // Verified crop math: Carrot 0.75/tile/d, Kohlrabi 0.67/tile/d -> ~5 tiles per beaver for surplus
     let crop_total = obs
         .summary
         .crops
         .as_ref()
         .map(|c| c.growing + c.ready)
         .unwrap_or(0);
-    if crop_total < 16 {
+    let desired_crops = (pop as u32 * 5).clamp(24, 72);
+    if crop_total < desired_crops {
+        // Plant across irrigated river-adjacent strips; duplicate tiles are ignored by the API.
+        let (x1, y1, x2, y2) = if crop_total < 24 {
+            (13, 15, 14, 24)
+        } else if crop_total < 48 {
+            (19, 18, 24, 24)
+        } else {
+            (13, 5, 14, 14)
+        };
         out.push(Action::PlantCrops {
-            x1: 13,
-            y1: 16,
-            x2: 14,
-            y2: 20,
+            x1,
+            y1,
+            x2,
+            y2,
             z: 2,
-            crop: "Carrot".to_string(),
-            reason: "plant Carrot patch for steady food output".to_string(),
+            crop: obs.primary_crop().to_string(),
+            reason: format!(
+                "expand {} patch ({crop_total} < target {desired_crops})",
+                obs.primary_crop()
+            ),
         });
     }
 }
 
 /// Deterministic logs manager:
-/// - Ensures a LumberjackFlag exists and stays staffed when logs are low.
-/// - Marks nearby tree clusters for cutting if logs drop below 30.
+/// - Ensures a LumberjackFlag exists and stays staffed when logs are needed.
+/// - Marks nearby tree clusters for cutting if logs drop below 45.
 pub fn logs_manager(obs: &Observation, out: &mut Vec<Action>) {
     let logs = obs.resource("Log");
     let lumberjacks: Vec<&Building> = obs
@@ -347,10 +452,10 @@ pub fn logs_manager(obs: &Observation, out: &mut Vec<Action>) {
 
     if lumberjacks.is_empty() {
         out.push(Action::FindAndPlace {
-            prefab: "LumberjackFlag.Folktails".to_string(),
+            prefab: format!("LumberjackFlag.{}", obs.faction_suffix()),
             reason: "place LumberjackFlag for wood supply".to_string(),
         });
-    } else if logs < 30 {
+    } else if logs < 45 {
         for lj in &lumberjacks {
             if lj.paused == 1 {
                 out.push(Action::PauseBuilding {
@@ -362,10 +467,10 @@ pub fn logs_manager(obs: &Observation, out: &mut Vec<Action>) {
         }
         if let Some(cluster) = obs.summary.tree_clusters.first() {
             out.push(Action::MarkTrees {
-                x1: cluster.x - 3,
-                y1: cluster.y - 3,
-                x2: cluster.x + 3,
-                y2: cluster.y + 3,
+                x1: cluster.x - 4,
+                y1: cluster.y - 4,
+                x2: cluster.x + 4,
+                y2: cluster.y + 4,
                 z: cluster.z,
                 reason: "mark tree cluster for cutting".to_string(),
             });
@@ -373,30 +478,79 @@ pub fn logs_manager(obs: &Observation, out: &mut Vec<Action>) {
     }
 }
 
-/// Deterministic housing manager:
-/// - Builds a Lodge when beavers are homeless and water/food/logs are safely above crisis levels.
-pub fn housing_manager(obs: &Observation, out: &mut Vec<Action>) {
+/// Deterministic housing & population-control manager (faction-aware):
+/// - Iron Teeth: pauses `BreedingPod.IronTeeth` whenever reserves are below hazard safety margin
+///   or population >= 15 (stopping 5W+5B/5d drain & excess mouths); builds `Barrack.IronTeeth`
+///   for homeless beavers when logs and reserves are comfortable.
+/// - Folktails: builds `Lodge.Folktails` for homeless beavers only when water/food safely exceed
+///   upcoming hazard reserves, capping unchecked growth before long Hard droughts.
+pub fn housing_manager(obs: &Observation, log_budget: &mut i64, out: &mut Vec<Action>) {
     let pop = obs.total_beavers().max(1) as i64;
     let homeless = obs.homeless();
     let water = obs.resource("Water");
     let food = obs.total_food();
-    let logs = obs.resource("Log");
-    let unfinished_lodges = obs
+    let hazard_days = obs.planned_hazard_days();
+    let safe_margin = pop * ((hazard_days * 2).clamp(6, 36));
+    let hazard_soon = obs.summary.weather.is_hazardous || obs.days_until_hazard() <= 3;
+
+    if obs.is_iron_teeth() {
+        let should_pause_pods =
+            hazard_soon || water < safe_margin || food < safe_margin || pop >= 15;
+        for b in &obs.buildings {
+            if b.name.starts_with("BreedingPod") && b.finished == 1 {
+                let is_paused = b.paused == 1;
+                if should_pause_pods && !is_paused {
+                    out.push(Action::PauseBuilding {
+                        id: b.id,
+                        paused: true,
+                        reason: "pause BreedingPod to conserve Water/Berries & cap pop".to_string(),
+                    });
+                } else if !should_pause_pods && is_paused {
+                    out.push(Action::PauseBuilding {
+                        id: b.id,
+                        paused: false,
+                        reason: "unpause BreedingPod with healthy reserves".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    let unfinished_housing = obs
         .buildings
         .iter()
-        .filter(|b| b.name.contains("Lodge") && b.finished == 0)
+        .filter(|b| {
+            (b.name.contains("Lodge") || b.name.contains("Barrack") || b.name.contains("Rowhouse"))
+                && b.finished == 0
+        })
         .count();
 
+    let total_beds: u32 = obs
+        .summary
+        .districts
+        .iter()
+        .filter_map(|d| d.housing.as_ref().map(|h| h.total_beds))
+        .sum();
+    let housing_cost = if obs.is_iron_teeth() { 40 } else { 12 };
+    let min_logs = if obs.is_iron_teeth() { 45 } else { 20 };
+    // Avoid Folktails population runaway past sustainable farm output: only add Lodges
+    // for currently homeless beavers when total_beds < 18 and reserves comfortably cover the hazard.
+    let housing_cap_ok = obs.is_iron_teeth() || total_beds < 18;
     if homeless > 0
-        && unfinished_lodges == 0
+        && housing_cap_ok
+        && unfinished_housing == 0
         && !obs.summary.weather.is_hazardous
         && water >= pop * 6
         && food >= pop * 6
-        && logs >= 20
+        && *log_budget >= min_logs
     {
+        *log_budget -= housing_cost;
         out.push(Action::FindAndPlace {
-            prefab: "Lodge.Folktails".to_string(),
-            reason: format!("build Lodge for {homeless} homeless beavers"),
+            prefab: obs.housing_prefab().to_string(),
+            reason: format!(
+                "build {} for {homeless} homeless beavers",
+                obs.housing_prefab()
+            ),
         });
     }
 }

@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
-use timberbot_agent::{AgentLoop, AgentLoopConfig};
+use timberbot_agent::{run_full_eval_matrix, AgentLoop, AgentLoopConfig};
 use timberbot_client::{ClientConfig, TimberbotClient};
 use timberbot_protocol::{DEFAULT_HTTP_PORT, DEFAULT_WS_PORT};
 
 #[derive(Debug, Parser)]
 #[command(
     name = "timberbot-agent",
-    about = "Reference pause-observe-plan-act-verify-unpause agent loop for Timberbot"
+    about = "Reference pause-observe-plan-act-verify-unpause agent loop and offline eval harness"
 )]
 struct Cli {
     #[arg(long, default_value = "127.0.0.1", env = "TBOT_HOST")]
@@ -35,6 +35,14 @@ struct Cli {
     /// Game speed when unpaused (1..=3).
     #[arg(long, default_value_t = 3)]
     speed: u8,
+
+    /// Run the offline 6-scenario (Folktails/IronTeeth x Easy/Normal/Hard) survival eval harness.
+    #[arg(long, default_value_t = false)]
+    eval: bool,
+
+    /// Print eval output as JSON instead of a markdown summary table.
+    #[arg(long, default_value_t = false)]
+    eval_json: bool,
 }
 
 #[tokio::main]
@@ -47,6 +55,20 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
+
+    if cli.eval {
+        let report = run_full_eval_matrix().await?;
+        if cli.eval_json {
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        } else {
+            print!("{}", report.to_markdown_table());
+        }
+        if !report.all_passed {
+            bail!("one or more eval matrix scenarios failed");
+        }
+        return Ok(());
+    }
+
     let client = TimberbotClient::new(ClientConfig {
         host: cli.host,
         http_port: cli.port,

@@ -13,10 +13,8 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 timberbot-client.workspace = true
+timberbot-mock.workspace = true
 timberbot-protocol.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
-[dev-dependencies]
-timberbot-mock.workspace = true

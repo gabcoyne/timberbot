@@ -46,7 +46,7 @@ BasicNeeds 5 (Hunger, Thirst, Sleep, Shelter, WetFur via Shower) · Social 11 (C
 **1.1 additions**: Sauna (300 SP, 10 log, 10 plank, 5 gear, social), Domed Garden (60 plank, 40 gear, also covers Wet Fur), and the Tier 4 monument **Hall of Abundance** (15,000 SP, 700 plank, 300 treated plank, 500 metal block). Their exact wellbeing points and the new max are **unverified**. Read `/api/wellbeing` in game.
 
 ## Folktails-specific priorities
-1. Housing drives growth. Keep 2–4 spare beds so kits keep coming, but never build so many that food and water can't keep up.
+1. Housing drives growth. Keep 2–4 spare beds while scaling up, but **cap total beds to sustainable farm output** (~3.6 Carrot tiles/beaver bare minimum from 2.67 food/day ÷ 0.75 Carrot/tile/day; budget **~5 tiles/beaver** for drought surplus) so a Lodge boom does not trigger a population runaway and Cycle 4–5 starvation.
 2. Carrots on day 1, then wheat and bread or potatoes and a Grill by mid-game, then aquatic crops once a stable shallow pool exists.
 3. Water wheels need **flowing** water. Put them in a dam spillway or a channel, not in a still lake. Windmills (and the Gravity Battery, 400 SP) cover droughts when rivers stop.
 4. Badwater Dome (2000 SP, 100 plank, 200 gear, 100 metal block) caps a badwater source. Folktails only.
