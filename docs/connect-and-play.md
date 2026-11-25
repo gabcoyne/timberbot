@@ -143,7 +143,7 @@ Verify connectivity from the **Grok Bot Machine**:
 curl -sf http://127.0.0.1:8085/api/ping
 
 # Option B (LAN / Tailscale with authToken):
-curl -sf -H "Authorization: Bearer $TIMBERBOT_AUTH_TOKEN" http://<game-host>:8085/api/ping
+curl -sf -H "Authorization: Bearer $TBOT_AUTH_TOKEN" http://<game-host>:8085/api/ping
 ```
 
 ---
@@ -174,19 +174,19 @@ Add `timberbot` to your Cursor `~/.cursor/mcp.json` (or Grok Bot MCP config). Re
       "command": "/abs/path/to/timberbot/rust/target/release/timberbot-mcp",
       "args": [
         "--host", "127.0.0.1",
-        "--http-port", "8085",
+        "--port", "8085",
         "--ws-port", "8086",
         "--save-root", "/abs/path/to/timberbot/scenarios"
       ],
       "env": {
-        "TIMBERBOT_AUTH_TOKEN": ""
+        "TBOT_AUTH_TOKEN": ""
       }
     }
   }
 }
 ```
 
-- For **Option B (LAN / Tailscale)**, replace `"127.0.0.1"` with `"<game-host>"` and set `TIMBERBOT_AUTH_TOKEN` to match `settings.json`.
+- For **Option B (LAN / Tailscale)**, replace `"127.0.0.1"` with `"<game-host>"` and set `TBOT_AUTH_TOKEN` to match `settings.json` (all supported env vars: `TBOT_HOST`, `TBOT_PORT`, `TBOT_WS_PORT`, `TBOT_AUTH_TOKEN`, `TIMBERBORN_LEVER_URL`, `TIMBERBORN_SAVE_ROOT`).
 
 ---
 
@@ -208,12 +208,12 @@ Before letting any agent place buildings or pause workplaces, verify read-only v
    ```
 3. In Grok Bot / Cursor (via `timberbot-mcp`), call **read-only** MCP tools first:
    - `timberbot_ping`
-   - `timberbot_ready`
+   - `timberbot_agent_state` (confirms `ready: true`, `mode`, `goal`)
    - `timberbot_summary`
    - `timberbot_weather`
    - `timberbot_resources`
    - `timberbot_buildings` (`limit: 20`)
-   - `timberbot_power`
+   - `timberbot_alerts` (and optionally `timberbot_beavers`, `timberbot_science`, `timberbot_tiles`)
 4. Pause the game (`speed=0`) or save a backup `.timber` archive before starting autonomous writes.
 
 ---
@@ -234,7 +234,7 @@ Timberbot uses Ryan Perry's 4-layer inner/outer split (see [Four-Layer Outer Loo
 # Dry-run / short burst first (4 decision cycles, pauses during decisions)
 ./rust/target/release/timberbot-agent \
   --host 127.0.0.1 \
-  --http-port 8085 \
+  --port 8085 \
   --ws-port 8086 \
   --cycles 4
 ```

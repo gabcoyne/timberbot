@@ -1,223 +1,116 @@
-# Timberbot API
+# Timberbot
 
 <p align="center">
   <img src="timberbot/src/thumbnail.png" alt="Timberbot — a cybernetic beaver playing Timberborn at a desk">
 </p>
 
-**Status: gameplay is stable; AI integration and automation features are under active development**
+> Fork of [impuls42/timberbot](https://github.com/impuls42/timberbot) (itself a fork of [abix-/TimberbornMods](https://github.com/abix-/TimberbornMods)). Adds a standalone Rust agent toolkit (`rust/`, GPL-3.0-or-later), a 4-layer inner/outer play & eval loop, 20 Timberborn 1.1 playbooks (`skills/`), and deterministic offline drills without changing the upstream C# mod HTTP (`:8085`) or WebSocket (`:8086`) contracts.
 
-> Fork of [impuls42/timberbot](https://github.com/impuls42/timberbot), which itself is a modified fork of [abix-/TimberbornMods](https://github.com/abix-/TimberbornMods). Adds a standalone Rust agent toolkit (protocol, async HTTP/WS client, read-only `.timber` save analyzer, deterministic mock server, stdio MCP server, and reference pause-observe-plan-act-verify-unpause agent loop), 20 Grok Bot gameplay playbooks (`skills/`), and offline end-to-end colony scenarios without changing the upstream C# mod HTTP/WS contract. All credit for the original mod goes to [abix-](https://github.com/abix-) and [impuls42](https://github.com/impuls42).
+[Connect & Play (2-Machine)](docs/connect-and-play.md) | [Four-Layer Outer Loop](docs/four-layer-outer-loop.md) | [Mock Fidelity](docs/mock-fidelity.md) | [Getting Started](docs/getting-started.md) | [Remote Access](docs/remote-access.md) | [API Reference](docs/api-reference.md) | [Skills Library](skills/README.md)
 
-[Getting Started](docs/getting-started.md) | [Connect & Play (2-Machine)](docs/connect-and-play.md) | [Game Build Compatibility](docs/game-build.md) | [Remote Access](docs/remote-access.md) | [Four-Layer Outer Loop](docs/four-layer-outer-loop.md) | [Mock Fidelity](docs/mock-fidelity.md) | [API Reference](docs/api-reference.md) | [WebSocket Protocol](docs/websocket-protocol.md) | [Skills Library](skills/README.md) | [Upstream](https://github.com/impuls42/timberbot)
-
-C# mod + Python client that lets AI agents read and control a running Timberborn game over HTTP, with a parallel WebSocket channel for push-style state and events.
+## Architecture at a Glance
 
 ```
-Timberborn (Unity)
-  |-- Timberbot API mod
-        |-- HTTP server  on :8085  read + write game state
-        |-- WS server    on :8086  /api/ws — state pushes + game events
-
-Python (PyPI: `timberbot`)
-  |-- `tbot` CLI                     dashboard, agent launcher, raw API client
-  |-- `tbot watch`                   long-running WS connector that drives an agent
-  |-- `tbot listen`                  WS event subscriber (CLI + scripts)
-  |-- `from timberbot import …`      typed Pydantic client for scripts
-
-Rust Toolkit (`rust/`, GPL-3.0-or-later — builds & tests with zero game DLLs)
-  |-- `timberbot-protocol`           typed HTTP/WS, official `:8080` Lever/Adapter, `.timber` models
-  |-- `timberbot-client`             async HTTP (`:8085`) + WS (`:8086`) + Lever (`:8080`) clients
-  |-- `timberbot-save`               read-only `.timber` ZIP (`world.json`) analyzer
-  |-- `timberbot-mock`               local mock HTTP :8085 + WS :8086 + Lever :8080 colony sim
-  |-- `timberbot-mcp`                standalone stdio MCP server (35 tools; no Telegram/ACP needed)
-  |-- `timberbot-agent`              reference pause-observe-plan-act-verify-unpause loop + managers
-
-Playbooks (`skills/`)
-  |-- 20 `timberborn-*/SKILL.md` playbooks + `scripts/lint_skills.py`
+Gaming Machine (Timberborn 1.1.2.0+)          Grok Bot / Dev Machine (zero game DLLs)
+  Timberbot C# Mod                              timberbot-mcp     (36 stdio MCP tools)
+    ├─ HTTP  :8085  read/write game state  ◀──  timberbot-agent   (pause-observe-plan-act loop)
+    ├─ WS    :8086  /api/ws state + events ◀──  timberbot-drills  (offline evals, 10 drills,
+    └─ Lever :8080  official 1.1 HTTP API  ◀──                     miss triage, HTML replay, promote)
+                                                timberbot-mock    (2D offline colony simulator)
+  Python `tbot` CLI / `tbot watch` also works   skills/           (20 Timberborn 1.1 playbooks)
 ```
 
-## Grok Bot Toolkit (Offline Dev, MCP & Live Play)
+- **Pinned game build:** `MinimumGameVersion: 1.1.2.0` (`timberbot/src/manifest.json`). Compatibility with newer Steam/GOG builds is **unverified** until compiled against that machine's `Managed/` DLLs — see [Game Build Compatibility](docs/game-build.md).
+- **No `/mcp` on the C# mod:** MCP runs out-of-process via `timberbot-mcp` (Rust stdio) or `tbot serve` (Python FastMCP SSE).
 
-### Verified Game Build Compatibility
+---
 
-- **Pinned minimum build in this repo:** Timberborn **1.1.2.0** (`MinimumGameVersion` in `timberbot/src/manifest.json`, mod version `0.8.0`). See [Game Build Compatibility](docs/game-build.md).
-- **Latest Steam / GOG build:** **unverified** (not yet compiled or playtested against the current Steam/GOG binaries in this environment).
-- **No `POST /mcp` on the C# mod:** the mod exposes HTTP on `:8085` and WebSocket on `:8086/api/ws` only. MCP runs out-of-process via either `timberbot-mcp` (Rust stdio, standalone) or `tbot serve` (Python FastMCP SSE on `127.0.0.1:8091/sse`).
+## Quickstart Handoff Prompt (Paste into a Fresh Grok Bot)
 
-### Develop & Test Without the Game
+Copy and paste the block below into a fresh Grok Bot session pointed at this repository:
 
-Everything in `rust/`, `scenarios/`, and `skills/` builds and runs with no Timberborn install, Steam, or game DLLs:
+```markdown
+You are operating **Timberbot** from the `gabcoyne/timberbot` repository to play and improve a Timberborn 1.1 colony.
+
+### 1. Ground Yourself in This Repo First
+- Read `docs/connect-and-play.md` (two-machine mod build, `:8085`/`:8086` verification, SSH tunnel vs. bearer-token bind, and `timberbot-mcp` wiring).
+- Read `skills/README.md` and consult relevant playbooks under `skills/timberborn-*/SKILL.md` before making colony decisions.
+- Respect `docs/mock-fidelity.md` (distinguish verified Timberborn 1.1 values from mock approximations and unverified items).
+
+### 2. Verify `timberbot-mcp` with a Read-Only Smoke Test (No Writes Yet)
+- Confirm the `timberbot-mcp` stdio server is wired (`--host`, `--port 8085`, `--ws-port 8086`, optional `--auth-token` / `TBOT_AUTH_TOKEN`, `--save-root`).
+- Run ONLY read-only MCP tools first:
+  1. `timberbot_ping` (liveness; gate-exempt)
+  2. `timberbot_agent_state` (check `ready`; remember `ready` resets to `false` on every save load until the player clicks **Launch** in the in-game widget)
+  3. `timberbot_summary`, `timberbot_weather`, `timberbot_resources`, `timberbot_buildings`, `timberbot_alerts`
+- Do NOT call mutating tools (`timberbot_place_building`, `timberbot_pause_building`, `timberbot_set_floodgate`, `timberbot_demolish_building`, etc.) until `ready` is `true` and the read-only snapshot looks sane. Always execute mutating calls sequentially.
+
+### 3. Run the 4-Layer Inner / Outer Improvement Loop
+- **Inner loop (play & log traces):** observe Layer 1 typed state (`timberbot-state`), choose one enabled tactic from the 12-tactic Layer 2 catalogue (`timberbot-tactics`), execute its playbook sequentially, and record Layer 3 JSONL traces.
+- **Outer loop (offline, zero live game required):** run `timberbot-drills` on traces and labeled cases:
+  - `timberbot-drills offline --cases scenarios/eval-cases.json --out-report /tmp/baseline.json`
+  - `timberbot-drills replay --traces <trace.jsonl>`
+  - `timberbot-drills surface-misses --traces <trace.jsonl> --cases scenarios/eval-cases.json` (triages misses into `StateBug`, `MissingCatalogueTactic`, `PickError`, `PlaybookBug`)
+  - `timberbot-drills harvest-cases --traces <trace.jsonl> --existing-cases scenarios/eval-cases.json --out /tmp/harvested.json`
+  - `timberbot-drills report --traces <trace.jsonl> --out-dir reports/latest` (writes `analytics.json`, `report.md`, and interactive `replay.html`)
+  - **Promotion gate (required before live play after any tactic/state/playbook change):**
+    `timberbot-drills promote --cases scenarios/eval-cases.json --baseline-report /tmp/baseline.json --trace-out /tmp/promoted.jsonl`
+    Only promote changes that pass **both** offline evals (0 regressions) **and** all 10 staged drills with 0 deaths and 0 playbook failures.
+```
+
+---
+
+## Inner Loop vs. Outer Loop: What Works Out of the Box vs. Fast-Model Setup
+
+### What a fresh Grok Bot can already do (no extra model key required)
+- **Outer loop:** full trace replay, 4-layer miss surfacing, labeled case harvesting, JSON/Markdown/HTML analytics & frame replay, offline evals (`18` cases), and all `10` staged mock drills via `timberbot-drills`.
+- **Live MCP play:** full read/write colony control, `:8080` official HTTP Levers, and read-only `.timber` save inspection through `timberbot-mcp`.
+- **Deterministic inner loop (`PolicyBackend::DeterministicBaseline`):** when `TIMBERBOT_LLM_URL` / `--llm-url` is unset, `timberbot-drills` automatically uses the pure-Rust baseline `decide()` policy with zero external network calls.
+
+### Optional: Priming a Fast-Model Inner Loop (`timberbot-tactics/src/llm.rs`)
+To run Ryan Perry's fast-model inner loop (e.g., a low-latency fast model or an Agent SDK / Jev-style proxy exposed as an OpenAI-compatible `/v1/chat/completions` endpoint), pass these exact shipped flags / environment variables to `timberbot-drills` (`offline`, `drills`, or `promote`):
+
+| Flag | Env Var | Default | Purpose |
+| --- | --- | --- | --- |
+| `--llm-url` | `TIMBERBOT_LLM_URL` | *(unset → baseline)* | OpenAI-compatible `/v1/chat/completions` (or direct JSON) endpoint URL |
+| `--llm-model` | `TIMBERBOT_LLM_MODEL` | `grok-3-mini` | Model ID sent in the request payload |
+| `--llm-api-key` | `TIMBERBOT_LLM_API_KEY` | *(unset)* | Optional `Authorization: Bearer` key for the model endpoint |
+| `--llm-timeout-ms` | — | `1500` | HTTP timeout before deterministic fallback |
+| `--llm-stale-ms` | — | `1200` | Latency ceiling; slower responses are marked stale and fall back |
+| `--llm-goal` | — | *(unset)* | Optional strategic goal appended to the decision prompt |
+
+There are **no** bespoke Cursor- or Jev-specific CLI flags in this repo: expose any fast model or Agent SDK gateway over an OpenAI-compatible HTTP endpoint and configure `TIMBERBOT_LLM_URL`. Every model reply is strictly validated (`{"tactic", "rationale", "commit_days?"}`, unknown fields rejected, tactic must be enabled in `available_catalogue`); on any HTTP error, timeout, stale latency, schema violation, or hallucinated/disabled tactic, `decide_with_backend()` deterministically falls back to baseline `decide()` and logs `DecisionSource::Fallback` in the trace.
+
+---
+
+## Offline Dev & Verification (No Game Required)
 
 ```bash
-# Run all unit tests, HTTP/WS/auth/ready-gate contract tests, MCP tool tests,
-# and all 4 E2E scenarios (fresh-start, incoming-drought survival, food-crisis, badtide)
+# 1. Build, lint, and run the full Rust test suite (protocol, mock, state, tactics, eval, drills, MCP, agent)
 (cd rust && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace)
 
-# Validate all 20 playbooks under skills/
+# 2. Validate all 20 Grok Bot playbooks
 python3 scripts/lint_skills.py
 
-# Run the local mock server with a scenario and drive it with the reference agent
-cargo run --manifest-path rust/Cargo.toml -p timberbot-mock -- --scenario scenarios/incoming-drought.json --ready
-cargo run --manifest-path rust/Cargo.toml -p timberbot-agent -- --cycles 8
-
-# Or run the standalone stdio MCP server for Grok Bot / any MCP client
-cargo run --manifest-path rust/Cargo.toml -p timberbot-mcp -- --save-root scenarios
+# 3. Run the dual promotion gate (18 offline evals + 10 staged drills) and emit JSON/MD/HTML analytics
+cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- promote --cases scenarios/eval-cases.json --trace-out /tmp/drills.jsonl
+cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- report --traces /tmp/drills.jsonl --out-dir /tmp/timberbot-report
 ```
 
-### Pointing the Bot at a Real Game on Another Machine
+---
 
-For the complete two-machine setup — compiling the C# mod against your gaming machine's Timberborn 1.1 `Managed/` DLLs, verifying `:8085`/`:8086`, SSH tunneling or bearer-token LAN exposure, wiring `timberbot-mcp` stdio into Grok Bot / Cursor, read-only smoke tests, inner-loop play, and outer-loop evals/analytics on real traces — see **[Connect & Play](docs/connect-and-play.md)** (and [Remote Access](docs/remote-access.md)).
+## Documentation
 
-Quick SSH tunnel from the bot host:
+- **[Connect & Play (2-Machine)](docs/connect-and-play.md)** — Build/install the C# mod against a gaming machine's Timberborn 1.1 `Managed/` DLLs, verify `:8085`/`:8086`, SSH tunnel or bearer-token bind, wire `timberbot-mcp`, smoke test, and run inner/outer loops on real traces.
+- **[Four-Layer Outer Loop](docs/four-layer-outer-loop.md)** — Layer 1 typed state, Layer 2 faction tactic catalogue & playbooks, Layer 3 trace evals & miss taxonomy, Layer 4 staged drills.
+- **[Mock Fidelity](docs/mock-fidelity.md)** — Honest `verified` / `approximated` / `unverified` audit of Timberborn 1.1 mechanics in `timberbot-mock` and `timberbot-save`.
+- **[Remote Access](docs/remote-access.md)** — SSH tunnel (recommended) vs. opt-in non-loopback `authToken` setup.
+- **[Game Build Compatibility](docs/game-build.md)** — Pinned `1.1.2.0` manifest minimum and verified contract boundaries.
+- **[Getting Started](docs/getting-started.md)** & **[Python `tbot` CLI / API Reference](docs/api-reference.md)** — Python client (`pipx install timberbot`), HTTP endpoints, and [WebSocket Protocol](docs/websocket-protocol.md).
+- **[Skills Library](skills/README.md)** — 20 Timberborn 1.1 playbooks and source audit ([`skills/SOURCES.md`](skills/SOURCES.md)).
+- **[Repo Guide](AGENTS.md)** & **[Developing](docs/developing.md)** — Project layout, C# mod conventions, and release workflow.
 
-```bash
-# On the bot machine: forward Timberbot HTTP (:8085), WS (:8086), and optional official HTTP Levers (:8080)
-ssh -N \
-  -L 8085:127.0.0.1:8085 \
-  -L 8086:127.0.0.1:8086 \
-  -L 8080:127.0.0.1:8080 \
-  <game-user>@<game-host>
-```
+## Requirements & Credits
 
-Then run `timberbot-mcp` or `timberbot-agent` on the bot machine against `127.0.0.1:8085` (and press **Launch** in the in-game Timberbot widget after loading a save). If you instead opt into a non-loopback `listenAddress` in `settings.json`, set a strong `authToken` — the mod refuses to start off-loopback without one.
-
-### Keeping Upstream Merges Clean
-
-All new toolkit code lives in isolated directories (`rust/`, `skills/`, `scenarios/`, `scripts/lint_skills.py`, `docs/game-build.md`, `docs/remote-access.md`, `.github/workflows/toolkit-ci.yml`) and leaves the C# mod and Python client contracts untouched. Pull upstream `impuls42/timberbot` changes directly into `main` without merge friction.
-
-### Verification Status & Open Roadmap
-
-See [`skills/SOURCES.md`](skills/SOURCES.md) and [`docs/game-build.md`](docs/game-build.md) for the full audit trail:
-
-- **Verified from repository source:** `MinimumGameVersion` `1.1.2.0`; HTTP `:8085` + WS `:8086` split with no `/mcp` route on the mod; ready-gate carve-out (`/api/ping`, `/api/ready`, `/api/agent/*`); non-loopback `authToken` guard; 5-level priority enum (`VeryLow`..`VeryHigh`); `POST /api/building/floodgate`; absence of `/api/save`; `ConfigureAutomation` component coverage (`WeatherStation`, `Timer`, and Floodgate preset heights are not wired); macOS/Linux/Windows `GameManagedDir` defaults in `Timberbot.csproj`.
-- **Assumed / unverified (needs real game install & playtest):** compatibility of `Timberbot.dll` against the newest Steam/GOG Timberborn build; whether the upstream Workshop mod still loads on 1.1; exact in-game mechanics numbers flagged *unverified* in `skills/` (housing capacities, difficulty handicap tables, irrigation/evaporation rates, 1.1 Wonder costs, Timer mode names); mock simulation rates (intentionally simplified approximations for deterministic CI).
-
-## Quick start
-
-```bash
-pipx install timberbot      # or: pip install timberbot
-tbot init                   # materialize agent prompts into ~/.config/timberbot
-```
-
-```bash
-# with Timberborn running + mod loaded
-tbot summary                                       # colony snapshot
-tbot buildings                                     # list all buildings
-tbot beavers                                       # beaver wellbeing + critical needs
-tbot map --x1=110 --y1=130 --x2=130 --y2=150               # ASCII map with terrain + blockers
-tbot place_building --prefab=Path --x=100 --y=130 --z=2 --orientation=south
-tbot place_path --x1=110 --y1=130 --x2=130 --y2=150        # A* pathfinding with auto-stairs
-tbot set_speed 3                                   # fast forward (positional)
-tbot science                                       # science points + unlockable buildings
-tbot distribution                                  # import/export settings per district
-tbot link --source-id=42 --target-id=44 --input=a  # wire sensor -> building
-tbot configure_automation --id=42 --property=threshold --value=50
-tbot brain                                         # live colony state + persistent memory
-tbot top                                           # live colony dashboard
-tbot                                               # list all commands
-```
-
-Auto-launch a save (Linux/Windows) or generate Steam launch args (macOS):
-
-```bash
-tbot launch --settlement=MyCastle --save=day5
-```
-
-`tbot` itself is a pure network client and does not read the game's Documents
-tree. On Linux/Steam Deck the build-time `scripts/deploy.sh` autodiscovers the
-Proton/Wine `Documents/Timberborn/Mods/Timberbot/` folder when copying the
-freshly built DLL; set `TBOT_DOCUMENTS_DIR` for non-`steamuser` Wine prefixes.
-
-Or use raw HTTP. no Python needed:
-
-```bash
-curl http://127.0.0.1:8085/api/summary
-curl -X POST http://127.0.0.1:8085/api/speed -d '{"speed": 3}'
-```
-
-Live state + game events over the WebSocket:
-
-```bash
-tbot listen --pretty                                # subscribe to ws://127.0.0.1:8086/api/ws
-tbot watch --backend claude                         # long-running agent connector
-```
-
-## Features
-
-- **WebSocket push channel**. State changes and game events stream over `ws://<host>:8086/api/ws` as `{type, payload}` JSON frames. See [WebSocket Protocol](docs/websocket-protocol.md).
-- **Ready gate**. Player presses **Launch** in the in-game widget to authorize agent activity; until then all `/api/*` calls (read + write) return `409 game_not_ready` except `/api/agent/*`, `/api/ready`, `/api/ping`.
-- **`tbot watch` connector**. Long-running Python process that connects over WS, heartbeats, and dispatches agent runs (request or autonomous mode).
-- **A* pathfinding**. `place_path` routes around obstacles, water, and ruins with auto-stairs.
-- **Automation wiring**. Link/unlink sensors, relays, memory cells to any pausable building, and configure thresholds, modes, logic over HTTP.
-- **Fresh-on-request reads**. No stale data, zero cost when idle.
-- **Blocker tracking**. Ruins and editor objects visible in `/api/tiles` and placement errors.
-- **Write job system**. Budgeted frame execution, no spikes.
-- **Debug endpoint**. Reflection inspector with chaining and validation.
-- **Bearer auth**. Optional `authToken` setting; mandatory when `listenAddress` is non-loopback.
-- **Safe by default**. Binds to `127.0.0.1`, refuses to start with a non-loopback listenAddress unless `authToken` is set, caps request body size.
-- **Zero-alloc hot path**. No garbage collection pressure on read endpoints.
-
-## Docs
-
-- [Getting Started](docs/getting-started.md). install, first steps, examples
-- [Game Build Compatibility](docs/game-build.md). pinned game version (`1.1.2.0`), unverified latest-build notice, checked contract gaps
-- [Remote Access](docs/remote-access.md). SSH tunnel (preferred) vs opt-in token-protected LAN bind
-- [Skills Library](skills/README.md). 20 Timberborn 1.1 Grok Bot playbooks and source audit ([`skills/SOURCES.md`](skills/SOURCES.md))
-- [API Reference](docs/api-reference.md). all HTTP endpoints
-- [WebSocket Protocol](docs/websocket-protocol.md). `/api/ws` frame envelope, message types, reconnect
-- [Events](docs/events.md). consume the game-event stream with `tbot listen` or a custom WS client
-- [Timberbot Guide](docs/timberbot.md). AI guide for agents playing Timberborn
-- [Architecture](docs/architecture.md). internals, thread model, read/write pipeline, WS broadcaster
-- [Automation Plan](design/automation-plan.md). decompiled wiring API and `/api/automation/*` design
-- [Agent Prompts](python/src/timberbot/agent_prompts/). drop-in gameplay prompts (`timberbot`, `scout`, `wirer`, `auditor`, `connector-mode`). Materialize editable copies into your user config dir with `tbot init`. The development-agent prompt for working on this codebase lives separately at [`agents/beaver-developer.md`](agents/beaver-developer.md).
-- [Repo Guide](AGENTS.md). project layout, build commands, conventions
-- [Developing](docs/developing.md). build from source, add endpoints, cutting a GitHub release
-
-## Settings
-
-Drop a `settings.json` in your mod folder (`Documents/Timberborn/Mods/Timberbot/`):
-
-```json
-{
-  "httpPort": 8085,
-  "wsPort": 8086,
-  "wsEnabled": true,
-  "listenAddress": "127.0.0.1",
-  "authToken": "",
-  "debugEndpointEnabled": false,
-  "maxBodyBytes": 1048576
-}
-```
-
-All fields are optional. Missing keys use defaults. The server binds to
-`127.0.0.1` by default; set `listenAddress` to `+` or `0.0.0.0` to accept LAN
-connections — but then `authToken` becomes mandatory (the mod refuses to start
-otherwise).
-
-Older settings keys are ignored with a one-line deprecation warning at load:
-
-- Agent-spawn keys (`terminal`, `pythonCommand`, `agentBinary`, `agentModel`, `agentEffort`, `agentCommandTemplate`, `agentAllowlistEnabled`, `agentAllowedBinaries`) — manage agent-side defaults via `~/.config/timberbot/config.toml` instead.
-- Webhook keys (`webhooksEnabled`, `webhookBatchMs`, `webhookCircuitBreaker`, `webhookMaxPendingEvents`, `webhookValidateUrls`) — outbound HTTP webhooks are gone; subscribe to the WS event stream instead (`tbot listen` or a custom WS client).
-
-## Requirements
-
-- Timberborn ≥ 1.1.2.0 (Steam; latest Steam/GOG build compatibility is unverified — see [Game Build Compatibility](docs/game-build.md))
-- .NET SDK 8+ (to build the C# mod against your local `Managed/` DLLs)
-- Rust stable ≥ 1.88 (for the offline `rust/` toolkit: `timberbot-mock`, `timberbot-mcp`, `timberbot-agent`)
-- Python 3.10+ (for the `tbot` CLI and `scripts/lint_skills.py`; install via `pipx install timberbot`)
-
-## Credits
-
-Forked from:
-
-- [abix-/TimberbornMods](https://github.com/abix-/TimberbornMods). upstream Timberbot mod. this repo is a modified fork with added HTTP API, automation wiring, WebSocket event stream, and AI-agent tooling
-
-Learned from these Timberborn modding projects:
-
-- [mechanistry/timberborn-modding](https://github.com/mechanistry/timberborn-modding). official modding tools, wiki, and examples
-- [thomaswp/BeaverBuddies](https://github.com/thomaswp/BeaverBuddies). `BlockObjectPlacerService.Place()` for building placement, `TemplateInstantiator` + `MarkAsPreviewAndInitialize` + `IsValid()` for game-native placement validation, `BuildingUnlockingService.Unlock()` for science, `WorkingHoursManager` for work schedules
-- [datvm/TimberbornMods](https://github.com/datvm/TimberbornMods). `TreeCuttingArea.AddCoordinates()` for tree marking, `IAlertFragment` patterns for building alerts
-- [ihsoft/TimberbornMods](https://github.com/ihsoft/TimberbornMods). `Inventories.AllInventories` for building inventory, `BuildingUnlockingService.Unlocked()` for science checks
-- [CordialGnom/timberborn-unity-modding](https://github.com/CordialGnom/timberborn-unity-modding). `PlantingService.SetPlantingCoordinates()` for crop planting, `PlantingAreaValidator.CanPlant()` for planting validation
-- [Timberborn-KyP-Mods/TimberPrint](https://github.com/Timberborn-KyP-Mods/TimberPrint). `PreviewFactory` + `BlockValidator` patterns for placement validation
-- [toon-format/toon](https://github.com/toon-format/toon). Token-Oriented Object Notation for compact AI output
+- **Requirements:** Timberborn ≥ `1.1.2.0` (latest Steam/GOG build unverified); .NET SDK 8+ (gaming machine C# mod build); Rust ≥ `1.88` (offline toolkit & MCP server); Python 3.10+ (`tbot` CLI & `scripts/lint_skills.py`).
+- **Credits:** Forked from [impuls42/timberbot](https://github.com/impuls42/timberbot) and [abix-/TimberbornMods](https://github.com/abix-/TimberbornMods); informed by `mechanistry/timberborn-modding`, `BeaverBuddies`, `datvm/TimberbornMods`, `ihsoft/TimberbornMods`, `CordialGnom/timberborn-unity-modding`, `TimberPrint`, and `toon-format`.
