@@ -1,0 +1,18 @@
+---
+description: Review a gabcoyne/timberbot pull request for correctness, Rust safety, license, secrets, and game DLLs. The reviewer is a different worker from the author.
+alwaysApply: false
+---
+
+# Review
+
+Follow `docs/sdlc.md`. Do not review a pull request you authored. Approve or request changes in the pull request review.
+
+Check:
+
+- Correctness of the change.
+- Rust safety: no unguarded panics or unwraps on live paths.
+- GPL-3.0. No secrets. No Timberborn or Unity game DLLs in the diff.
+- Docs and skills stay consistent with the change.
+- One small pull request targeting `main`, not stacked on an unmerged branch, with `Closes #<issue>`.
+- A regression test, or an offline eval or staged-drill case, covers the reported failure.
+- If the diff touches `timberbot/`, the pull request says the gaming machine must rebuild and upload `timberbot-mod-<version>.zip` with `scripts/package-mod.ps1` or `scripts/package-mod.sh`.

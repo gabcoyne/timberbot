@@ -72,6 +72,7 @@ nav:
   - Performance: performance.md
   - macOS Testing: macos-testing.md
   - Developing: developing.md
+  - SDLC: sdlc.md
   - Dev Environment: devenv.md
   - Game build pin: game-build.md
   - Remote access: remote-access.md
