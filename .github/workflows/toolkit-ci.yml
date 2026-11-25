@@ -1,0 +1,55 @@
+name: Toolkit CI (Rust + Skills)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rust-toolkit:
+    # Builds and tests the out-of-process Rust toolkit (protocol, client,
+    # read-only .timber analyzer, mock server, stdio MCP server, and reference
+    # agent loop) entirely offline against timberbot-mock.
+    #
+    # Note: timberbot/src/Timberbot.csproj (the C# Unity mod) requires
+    # proprietary Timberborn Managed/ DLLs and is intentionally NOT built here.
+    # Unity-free C# helper tests live in .github/workflows/dotnet-tests.yml.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy lint (warnings as errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run unit and end-to-end mock scenario tests
+        run: cargo test --workspace -- --nocapture
+
+  skills-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Lint Timberborn Grok Bot playbooks
+        run: python3 scripts/lint_skills.py

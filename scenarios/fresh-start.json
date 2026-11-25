@@ -1,0 +1,85 @@
+{
+  "name": "FreshStartColony",
+  "faction": "Folktails",
+  "district_name": "District 1",
+  "day_number": 1,
+  "cycle": 1,
+  "cycle_day": 1,
+  "temperate_weather_duration": 14,
+  "hazardous_weather_duration": 4,
+  "is_hazardous": false,
+  "hazard_kind": "drought",
+  "adults": 8,
+  "children": 3,
+  "bots": 0,
+  "science": 0,
+  "resources": {
+    "Water": 95,
+    "Berries": 85,
+    "Carrot": 20,
+    "Log": 60,
+    "Plank": 0
+  },
+  "buildings": [
+    {
+      "name": "DistrictCenter.Folktails",
+      "x": 16,
+      "y": 16,
+      "z": 2,
+      "orientation": "south",
+      "finished": true,
+      "paused": false,
+      "workers": 2
+    },
+    {
+      "name": "WaterPump.Folktails",
+      "x": 12,
+      "y": 14,
+      "z": 2,
+      "orientation": "south",
+      "finished": true,
+      "paused": false,
+      "workers": 1
+    },
+    {
+      "name": "SmallTank.Folktails",
+      "x": 14,
+      "y": 14,
+      "z": 2,
+      "orientation": "south",
+      "finished": true,
+      "paused": false,
+      "allowed_good": "Water",
+      "storage_mode": "accept"
+    },
+    {
+      "name": "LumberjackFlag.Folktails",
+      "x": 18,
+      "y": 18,
+      "z": 2,
+      "orientation": "south",
+      "finished": true,
+      "paused": false,
+      "workers": 1
+    }
+  ],
+  "initial_trees": 48,
+  "initial_crops": 4,
+  "initial_gatherables": 24,
+  "reservoir_water_depth": 1.6,
+  "river_contamination": 0.0,
+  "levers": [
+    {
+      "name": "BotKillSwitch",
+      "state": false,
+      "springReturn": false,
+      "color": "00FF00"
+    }
+  ],
+  "adapters": [
+    {
+      "name": "WaterAlarm",
+      "state": false
+    }
+  ]
+}
