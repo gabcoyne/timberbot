@@ -14,7 +14,7 @@ fn checked_in_eval_cases_pass_100_percent_offline() {
         .join("scenarios/eval-cases.json");
 
     let cases = load_cases(&cases_path).expect("load scenarios/eval-cases.json");
-    assert!(cases.len() >= 12, "expected >= 12 labeled offline cases");
+    assert!(cases.len() >= 18, "expected >= 18 labeled offline cases");
     let report = evaluate_cases(&cases);
     for r in &report.results {
         assert!(

@@ -17,12 +17,15 @@ use timberbot_state::{
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum TacticId {
+    RecoverColonyCrisis,
     DivertBadtideFloodgates,
     EmergencyFoodRationing,
     SecureEarlyWater,
     BuildDamBeforeDrought,
     StagePlankChain,
+    StageGearChain,
     UnlockAndPlantForester,
+    ManageBreedingPods,
     AdvanceScienceAndQueue,
     ExpandHousingCapped,
     HoldAndMonitor,
@@ -31,12 +34,15 @@ pub enum TacticId {
 impl TacticId {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::RecoverColonyCrisis => "recover_colony_crisis",
             Self::DivertBadtideFloodgates => "divert_badtide_floodgates",
             Self::EmergencyFoodRationing => "emergency_food_rationing",
             Self::SecureEarlyWater => "secure_early_water",
             Self::BuildDamBeforeDrought => "build_dam_before_drought",
             Self::StagePlankChain => "stage_plank_chain",
+            Self::StageGearChain => "stage_gear_chain",
             Self::UnlockAndPlantForester => "unlock_and_plant_forester",
+            Self::ManageBreedingPods => "manage_breeding_pods",
             Self::AdvanceScienceAndQueue => "advance_science_and_queue",
             Self::ExpandHousingCapped => "expand_housing_capped",
             Self::HoldAndMonitor => "hold_and_monitor",
@@ -45,12 +51,15 @@ impl TacticId {
 
     pub fn from_name(s: &str) -> Option<Self> {
         match s {
+            "recover_colony_crisis" => Some(Self::RecoverColonyCrisis),
             "divert_badtide_floodgates" => Some(Self::DivertBadtideFloodgates),
             "emergency_food_rationing" => Some(Self::EmergencyFoodRationing),
             "secure_early_water" => Some(Self::SecureEarlyWater),
             "build_dam_before_drought" => Some(Self::BuildDamBeforeDrought),
             "stage_plank_chain" => Some(Self::StagePlankChain),
+            "stage_gear_chain" => Some(Self::StageGearChain),
             "unlock_and_plant_forester" => Some(Self::UnlockAndPlantForester),
+            "manage_breeding_pods" => Some(Self::ManageBreedingPods),
             "advance_science_and_queue" => Some(Self::AdvanceScienceAndQueue),
             "expand_housing_capped" => Some(Self::ExpandHousingCapped),
             "hold_and_monitor" => Some(Self::HoldAndMonitor),
@@ -119,7 +128,31 @@ fn fits_before_hazard(state: &ColonyState, lead_time_days: f64) -> bool {
 pub fn available_catalogue(state: &ColonyState) -> Vec<CatalogueEntry> {
     let f = state.faction;
     let suffix = f.suffix();
-    let mut entries = Vec::with_capacity(9);
+    let mut entries = Vec::with_capacity(12);
+
+    // 0. recover_colony_crisis
+    {
+        let mut blocked_by = Vec::new();
+        let has_crisis = state.unreachable_buildings > 0
+            || state.disconnected_power_consumers > 0
+            || (state.water_runway_hours < 36.0 && state.food_runway_hours < 36.0)
+            || (state.contaminated_beavers > 0
+                && (state.pumps_paused > 0 || state.farms_paused > 0));
+        if !has_crisis {
+            blocked_by.push(
+                "no multi-system crisis, unreachable site, or disconnected power".to_string(),
+            );
+        }
+        entries.push(CatalogueEntry {
+            tactic: TacticId::RecoverColonyCrisis,
+            faction: f,
+            enabled: has_crisis,
+            lead_time_days: 0.25,
+            feasible_before_hazard: true,
+            blocked_by,
+            description: "Reconnect isolated sites with Paths, bridge disconnected power networks with PowerShafts, and triage dual water+food collapse".to_string(),
+        });
+    }
 
     // 1. divert_badtide_floodgates
     {
@@ -307,7 +340,56 @@ pub fn available_catalogue(state: &ColonyState) -> Vec<CatalogueEntry> {
         });
     }
 
-    // 6. unlock_and_plant_forester
+    // 6. stage_gear_chain (mid/late-game: 120 hp power + 100 SP + 15 Log + 25 Plank -> GearWorkshop)
+    {
+        let mut blocked_by = Vec::new();
+        let gw_prefab = format!("GearWorkshop.{suffix}");
+        let need_extra_power = state.power_supply < state.power_demand + 120.0
+            && state.gear_workshops_finished == 0
+            && state.gear_workshops_queued == 0;
+        let lead = estimate_lead_time_days(state, &gw_prefab, 40.0)
+            + if need_extra_power { 0.5 } else { 0.0 };
+        if !state.gear_workshop_unlocked && state.science < 100 {
+            blocked_by.push(format!(
+                "needs 100 SP for GearWorkshop (have {})",
+                state.science
+            ));
+        }
+        if state.gear_workshops_finished == 0 && state.gear_workshops_queued == 0 {
+            if state.logs < 15 {
+                blocked_by.push(format!(
+                    "needs 15 Log for GearWorkshop (have {})",
+                    state.logs
+                ));
+            }
+            if state.planks < 25 {
+                blocked_by.push(format!(
+                    "needs 25 Plank for GearWorkshop (have {})",
+                    state.planks
+                ));
+            }
+            if need_extra_power && state.logs < 35 {
+                blocked_by.push(format!(
+                    "needs >= 120 hp surplus power or 35 Log for WaterWheel/PowerWheel (have {:.0} hp, {} Log)",
+                    (state.power_supply - state.power_demand).max(0.0),
+                    state.logs
+                ));
+            }
+        }
+        entries.push(CatalogueEntry {
+            tactic: TacticId::StageGearChain,
+            faction: f,
+            enabled: !state.weather_phase.is_hazardous() && blocked_by.is_empty(),
+            lead_time_days: round2(lead),
+            feasible_before_hazard: fits_before_hazard(state, lead),
+            blocked_by,
+            description: format!(
+                "Ensure >=120 hp connected power, unlock/build {gw_prefab} (15 Log + 25 Plank), and produce Gears"
+            ),
+        });
+    }
+
+    // 7. unlock_and_plant_forester
     {
         let mut blocked_by = Vec::new();
         let forester_prefab = format!("Forester.{suffix}");
@@ -336,7 +418,34 @@ pub fn available_catalogue(state: &ColonyState) -> Vec<CatalogueEntry> {
         });
     }
 
-    // 7. advance_science_and_queue
+    // 8. manage_breeding_pods (Iron Teeth population & berry/bed throttle)
+    {
+        let mut blocked_by = Vec::new();
+        if f != Faction::IronTeeth {
+            blocked_by.push("Iron Teeth faction only".to_string());
+        }
+        let has_any_pod = state.breeding_pods_active > 0
+            || state.breeding_pods_paused > 0
+            || state.breeding_pods_queued > 0;
+        let can_build_pod = !has_any_pod && state.logs >= 20 && state.berries >= 15;
+        if f == Faction::IronTeeth && !has_any_pod && !can_build_pod {
+            blocked_by.push(format!(
+                "needs 20 Log and 15 Berries to place BreedingPod (have {} Log, {} Berries)",
+                state.logs, state.berries
+            ));
+        }
+        entries.push(CatalogueEntry {
+            tactic: TacticId::ManageBreedingPods,
+            faction: f,
+            enabled: f == Faction::IronTeeth && (has_any_pod || can_build_pod),
+            lead_time_days: if has_any_pod { 0.0 } else { estimate_lead_time_days(state, "BreedingPod.IronTeeth", 20.0) },
+            feasible_before_hazard: true,
+            blocked_by,
+            description: "Iron Teeth: pause BreedingPods when beds/berries/runways are tight; resume/place when healthy".to_string(),
+        });
+    }
+
+    // 9. advance_science_and_queue
     {
         let mut blocked_by = Vec::new();
         let inv_prefab = format!("Inventor.{suffix}");
@@ -458,6 +567,23 @@ pub fn decide(state: &ColonyState) -> Decision {
             format!(
                 "0 active builders with {} queued construction sites — restore builders first",
                 state.construction_queue.len()
+            ),
+            Some(1),
+        );
+    }
+
+    // --- Priority 0.5: Multi-system crisis, unreachable site, or disconnected power network ---
+    let crisis_entry = entry_of(TacticId::RecoverColonyCrisis);
+    if crisis_entry.enabled {
+        return pick(
+            TacticId::RecoverColonyCrisis,
+            format!(
+                "Colony crisis/topology break (unreachable={}, disconnected_power={}, water={:.1}h, food={:.1}h, contam_beavers={}): recover connectivity and essentials",
+                state.unreachable_buildings,
+                state.disconnected_power_consumers,
+                state.water_runway_hours,
+                state.food_runway_hours,
+                state.contaminated_beavers
             ),
             Some(1),
         );
@@ -669,6 +795,68 @@ pub fn decide(state: &ColonyState) -> Decision {
         );
     }
 
+    // --- Priority 8.5: Iron Teeth BreedingPod throttle / resume ---
+    let pod_entry = entry_of(TacticId::ManageBreedingPods);
+    if state.faction == Faction::IronTeeth && pod_entry.enabled {
+        let should_pause_pods = state.breeding_pods_active > 0
+            && (state.free_beds <= 0
+                || state.berries < 15
+                || state.water_runway_hours < 60.0
+                || state.food_runway_hours < 60.0
+                || state.weather_phase.is_hazardous());
+        let should_resume_or_build_pods = !state.weather_phase.is_hazardous()
+            && state.breeding_pods_active == 0
+            && state.breeding_pods_queued == 0
+            && state.free_beds >= 2
+            && state.berries >= 15
+            && state.water_runway_hours >= 72.0
+            && state.food_runway_hours >= 72.0
+            && state.population < 22;
+        if should_pause_pods {
+            return pick(
+                TacticId::ManageBreedingPods,
+                format!(
+                    "Iron Teeth pod throttle (active_pods={}, free_beds={}, berries={}, water={:.1}h, food={:.1}h, phase={:?})",
+                    state.breeding_pods_active,
+                    state.free_beds,
+                    state.berries,
+                    state.water_runway_hours,
+                    state.food_runway_hours,
+                    state.weather_phase
+                ),
+                Some(1),
+            );
+        }
+        if should_resume_or_build_pods {
+            return pick(
+                TacticId::ManageBreedingPods,
+                format!(
+                    "Iron Teeth pod resume/build (paused_pods={}, free_beds={}, berries={}, runways healthy)",
+                    state.breeding_pods_paused, state.free_beds, state.berries
+                ),
+                Some(2),
+            );
+        }
+    }
+
+    // --- Priority 8.75: Mid-game GearWorkshop & power expansion chain ---
+    let gear_entry = entry_of(TacticId::StageGearChain);
+    if state.gears < 10
+        && state.gear_workshops_finished == 0
+        && state.gear_workshops_queued == 0
+        && gear_entry.enabled
+        && gear_entry.feasible_before_hazard
+    {
+        return pick(
+            TacticId::StageGearChain,
+            format!(
+                "Mid-game gear bottleneck (gears={}, planks={}, sp={}, power={:.0}/{:.0}hp): stage GearWorkshop chain",
+                state.gears, state.planks, state.science, state.power_supply, state.power_demand
+            ),
+            Some(3),
+        );
+    }
+
     // --- Priority 9: Capped housing expansion (only with healthy water & food runways) ---
     let house_entry = entry_of(TacticId::ExpandHousingCapped);
     if state.free_beds <= 1 && house_entry.enabled {
@@ -725,6 +913,104 @@ async fn run_playbook(
     let buildings = client.buildings(&all).await?.items;
 
     match tactic {
+        TacticId::RecoverColonyCrisis => {
+            // 1. Reconnect unreachable sites with a Path chain from DistrictCenter
+            if let Some(dc) = buildings
+                .iter()
+                .find(|b| b.finished == 1 && b.name.starts_with("DistrictCenter"))
+            {
+                if dc.paused == 1 {
+                    client.pause_building(dc.id, false).await?;
+                    steps.push(format!("unpause DistrictCenter {}", dc.id));
+                }
+                if dc.desired_workers.unwrap_or(0) < 2 {
+                    client.set_workers(dc.id, 2).await?;
+                    steps.push(format!("restore 2 builders on DistrictCenter {}", dc.id));
+                }
+                if let Some(target) = buildings
+                    .iter()
+                    .find(|b| b.reachable == Some(0) && !b.name.contains("Path"))
+                {
+                    let laid =
+                        lay_line(client, "Path", (dc.x, dc.y), (target.x, target.y), 2, 16).await?;
+                    if laid > 0 {
+                        steps.push(format!(
+                            "lay {laid} Path tiles from DC ({},{}) to unreachable {} ({},{})",
+                            dc.x, dc.y, target.name, target.x, target.y
+                        ));
+                    }
+                }
+            }
+
+            // 2. Bridge disconnected power consumers with PowerShafts from nearest generator
+            if state.disconnected_power_consumers > 0 {
+                let shaft_prefab = format!("PowerShaft.{suffix}");
+                if let Some(consumer) = buildings.iter().find(|b| {
+                    b.finished == 1
+                        && b.paused == 0
+                        && b.is_consumer == Some(1)
+                        && b.powered == Some(0)
+                }) {
+                    if let Some(gen) = buildings
+                        .iter()
+                        .filter(|b| b.finished == 1 && b.paused == 0 && b.is_generator == Some(1))
+                        .min_by_key(|g| (g.x - consumer.x).abs().max((g.y - consumer.y).abs()))
+                    {
+                        let laid = lay_line(
+                            client,
+                            &shaft_prefab,
+                            (gen.x, gen.y),
+                            (consumer.x, consumer.y),
+                            3,
+                            10,
+                        )
+                        .await?;
+                        if laid > 0 {
+                            steps.push(format!(
+                                "bridge {} ({},{}) -> {} ({},{}) with {laid} {shaft_prefab}",
+                                gen.name, gen.x, gen.y, consumer.name, consumer.x, consumer.y
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // 3. Triage essential food & clean water buildings during dual collapse
+            let clean_river =
+                state.river_depth > 0.05 && state.river_contamination < IRRIGATION_POLLUTION_CUTOFF;
+            for b in buildings.iter().filter(|b| {
+                b.finished == 1
+                    && (b.name.contains("FarmHouse")
+                        || b.name.contains("Farmhouse")
+                        || b.name.contains("GathererFlag")
+                        || (clean_river && b.name.contains("WaterPump")))
+            }) {
+                if b.paused == 1 {
+                    client.pause_building(b.id, false).await?;
+                    steps.push(format!("unpause essential {} ({})", b.name, b.id));
+                }
+                if b.workplace_priority != Some(Priority::VeryHigh) {
+                    client
+                        .set_priority(&SetPriorityRequest {
+                            id: b.id,
+                            priority: Priority::VeryHigh,
+                            priority_type: Some("workplace".to_string()),
+                        })
+                        .await?;
+                    steps.push(format!(
+                        "prioritize essential {} ({}) VeryHigh",
+                        b.name, b.id
+                    ));
+                }
+            }
+            if (state.water_runway_hours < 36.0 && state.food_runway_hours < 36.0)
+                && state.work_hours < 18
+            {
+                client.set_workhours(18).await?;
+                steps.push("extend workhours to 18h for dual-crisis triage".to_string());
+            }
+        }
+
         TacticId::DivertBadtideFloodgates => {
             let badtide_now = state.weather_phase == WeatherPhase::Badtide
                 || state.upstream_contamination >= 0.25
@@ -996,6 +1282,121 @@ async fn run_playbook(
             }
         }
 
+        TacticId::StageGearChain => {
+            let gw_prefab = format!("GearWorkshop.{suffix}");
+            let shaft_prefab = format!("PowerShaft.{suffix}");
+            // 1. Ensure enough connected power supply (>= demand + 120 hp)
+            if state.power_supply < state.power_demand + 120.0 {
+                let gen_prefab = match state.faction {
+                    Faction::Folktails => "WaterWheel.Folktails",
+                    Faction::IronTeeth => "LargePowerWheel.IronTeeth",
+                };
+                let (gx, gy) = match state.faction {
+                    Faction::Folktails => (10, 16),
+                    Faction::IronTeeth => (17, 17),
+                };
+                if let Some(id) = place_near(client, gen_prefab, gx, gy, 6).await? {
+                    client
+                        .set_priority(&SetPriorityRequest {
+                            id,
+                            priority: Priority::High,
+                            priority_type: Some("construction".to_string()),
+                        })
+                        .await?;
+                    steps.push(format!(
+                        "place power generator {gen_prefab} ({id}) for gears"
+                    ));
+                    // If Folktails WaterWheel on river x=10, lay PowerShafts toward workshop hub (17,16)
+                    if state.faction == Faction::Folktails {
+                        let laid =
+                            lay_line(client, &shaft_prefab, (10, 16), (17, 16), 3, 4).await?;
+                        if laid > 0 {
+                            steps.push(format!(
+                                "lay {laid} {shaft_prefab} from river WaterWheel to hub"
+                            ));
+                        }
+                    }
+                }
+            } else {
+                // 2. Unlock & place GearWorkshop adjacent to an existing power generator
+                if !state.gear_workshop_unlocked && state.science >= 100 {
+                    client.unlock_building(&gw_prefab).await?;
+                    steps.push(format!("unlock {gw_prefab} (100 SP)"));
+                }
+                if state.gear_workshops_finished == 0
+                    && state.gear_workshops_queued == 0
+                    && state.logs >= 15
+                    && state.planks >= 25
+                {
+                    let (ax, ay) = buildings
+                        .iter()
+                        .find(|b| b.finished == 1 && b.is_generator == Some(1) && b.x >= 13)
+                        .or_else(|| {
+                            buildings
+                                .iter()
+                                .find(|b| b.finished == 1 && b.name.contains("PowerShaft"))
+                        })
+                        .map(|b| (b.x, b.y))
+                        .unwrap_or((17, 17));
+                    if let Some(id) = place_near(client, &gw_prefab, ax, ay, 3).await? {
+                        client
+                            .set_priority(&SetPriorityRequest {
+                                id,
+                                priority: Priority::High,
+                                priority_type: Some("construction".to_string()),
+                            })
+                            .await?;
+                        steps.push(format!(
+                            "place & prioritize {gw_prefab} ({id}) near power hub ({ax},{ay})"
+                        ));
+                    } else if let Some(id) = place_near(client, &gw_prefab, 18, 17, 6).await? {
+                        steps.push(format!("place {gw_prefab} ({id})"));
+                    }
+                }
+            }
+        }
+
+        TacticId::ManageBreedingPods => {
+            let should_pause = state.free_beds <= 0
+                || state.berries < 15
+                || state.water_runway_hours < 60.0
+                || state.food_runway_hours < 60.0
+                || state.weather_phase.is_hazardous();
+            if should_pause {
+                for b in buildings.iter().filter(|b| {
+                    b.finished == 1 && b.paused == 0 && b.name.starts_with("BreedingPod")
+                }) {
+                    client.pause_building(b.id, true).await?;
+                    steps.push(format!(
+                        "pause BreedingPod {} to protect beds/berries/runway",
+                        b.id
+                    ));
+                }
+            } else {
+                let mut resumed = false;
+                for b in buildings.iter().filter(|b| {
+                    b.finished == 1 && b.paused == 1 && b.name.starts_with("BreedingPod")
+                }) {
+                    client.pause_building(b.id, false).await?;
+                    steps.push(format!(
+                        "resume BreedingPod {} with healthy runways & free beds",
+                        b.id
+                    ));
+                    resumed = true;
+                }
+                if !resumed
+                    && state.breeding_pods_active == 0
+                    && state.breeding_pods_queued == 0
+                    && state.logs >= 20
+                {
+                    if let Some(id) = place_near(client, "BreedingPod.IronTeeth", 17, 18, 8).await?
+                    {
+                        steps.push(format!("place BreedingPod.IronTeeth ({id})"));
+                    }
+                }
+            }
+        }
+
         TacticId::UnlockAndPlantForester => {
             let forester = format!("Forester.{suffix}");
             if !state.forester_unlocked && state.science >= 30 {
@@ -1107,6 +1508,47 @@ async fn place_near(
     Ok(placed.get("id").and_then(|v| v.as_i64()))
 }
 
+/// Lay a deterministic stepped line of `Path` or `PowerShaft` tiles from `from` to `to`.
+async fn lay_line(
+    client: &TimberbotClient,
+    prefab: &str,
+    from: (i32, i32),
+    to: (i32, i32),
+    step: i32,
+    max_tiles: usize,
+) -> Result<usize> {
+    let mut laid = 0usize;
+    let (mut cx, mut cy) = from;
+    let (x1, y1) = to;
+    let step = step.max(1);
+
+    for _ in 0..max_tiles {
+        let dx = x1 - cx;
+        let dy = y1 - cy;
+        if dx.abs() <= step && dy.abs() <= step {
+            break;
+        }
+        if dx.abs() >= dy.abs() {
+            cx += dx.signum() * dx.abs().min(step);
+        } else {
+            cy += dy.signum() * dy.abs().min(step);
+        }
+        let req = PlaceBuildingRequest {
+            prefab: prefab.to_string(),
+            x: cx,
+            y: cy,
+            z: 2,
+            orientation: Orientation::South,
+        };
+        if client.place_building(&req).await.is_ok()
+            || place_near(client, prefab, cx, cy, 1).await?.is_some()
+        {
+            laid += 1;
+        }
+    }
+    Ok(laid)
+}
+
 /// Convenience helper combining Layer 1 (`ModSnapshot::fetch` -> `ColonyState`) and Layer 2
 /// (`decide` -> `execute_tactic`), returning `(state, decision, outcome, next_commitment)`.
 pub async fn run_four_layer_tick(
@@ -1201,6 +1643,15 @@ mod tests {
             total_crops: 30,
             grown_crops: 10,
             breeding_pods_active: 0,
+            breeding_pods_paused: 0,
+            breeding_pods_queued: 0,
+            gear_workshops_finished: 0,
+            gear_workshops_queued: 0,
+            gear_workshop_unlocked: false,
+            unreachable_buildings: 0,
+            disconnected_power_consumers: 0,
+            power_network_count: 1,
+            wellbeing_avg: 8.0,
             construction_queue: Vec::new(),
             blocked_prerequisites: Vec::new(),
             active_commitment: None,
@@ -1284,5 +1735,45 @@ mod tests {
             .unwrap();
         assert!(!dam.feasible_before_hazard);
         assert!(!dam.enabled);
+    }
+
+    #[test]
+    fn midgame_gear_chain_picks_stage_gear_chain_when_planks_and_science_ready() {
+        let mut s = healthy_state();
+        s.planks = 30;
+        s.logs = 50;
+        s.gears = 0;
+        s.science = 150;
+        s.power_supply = 200.0;
+        s.power_demand = 50.0;
+        assert_eq!(decide(&s).tactic, TacticId::StageGearChain);
+    }
+
+    #[test]
+    fn iron_teeth_breeding_pod_throttles_when_beds_or_berries_tight() {
+        let mut s = healthy_state();
+        s.faction = Faction::IronTeeth;
+        s.breeding_pods_active = 2;
+        s.free_beds = 0;
+        s.berries = 10;
+        assert_eq!(decide(&s).tactic, TacticId::ManageBreedingPods);
+
+        // Resumes paused pod when beds & berries are healthy
+        s.breeding_pods_active = 0;
+        s.breeding_pods_paused = 1;
+        s.free_beds = 4;
+        s.berries = 45;
+        assert_eq!(decide(&s).tactic, TacticId::ManageBreedingPods);
+    }
+
+    #[test]
+    fn crisis_recovery_handles_unreachable_sites_and_disconnected_power() {
+        let mut s = healthy_state();
+        s.unreachable_buildings = 1;
+        assert_eq!(decide(&s).tactic, TacticId::RecoverColonyCrisis);
+
+        let mut s2 = healthy_state();
+        s2.disconnected_power_consumers = 1;
+        assert_eq!(decide(&s2).tactic, TacticId::RecoverColonyCrisis);
     }
 }

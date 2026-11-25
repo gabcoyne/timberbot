@@ -120,6 +120,12 @@ pub enum BlockedPrerequisite {
         river_depth: f64,
         river_contamination: f64,
     },
+    UnreachableSite {
+        building: String,
+    },
+    DisconnectedPowerNetwork {
+        consumer: String,
+    },
 }
 
 /// Multi-day commitment carried across decision cycles so the agent does not thrash.
@@ -269,6 +275,24 @@ pub struct ColonyState {
     pub total_crops: u32,
     pub grown_crops: u32,
     pub breeding_pods_active: u32,
+    #[serde(default)]
+    pub breeding_pods_paused: u32,
+    #[serde(default)]
+    pub breeding_pods_queued: u32,
+    #[serde(default)]
+    pub gear_workshops_finished: u32,
+    #[serde(default)]
+    pub gear_workshops_queued: u32,
+    #[serde(default)]
+    pub gear_workshop_unlocked: bool,
+    #[serde(default)]
+    pub unreachable_buildings: u32,
+    #[serde(default)]
+    pub disconnected_power_consumers: u32,
+    #[serde(default)]
+    pub power_network_count: u32,
+    #[serde(default)]
+    pub wellbeing_avg: f64,
 
     // Queues, ETAs, prerequisites, commitments
     pub construction_queue: Vec<ConstructionEta>,
@@ -452,10 +476,18 @@ impl ColonyState {
         let mut power_generators_queued = 0u32;
         let mut inventors_finished = 0u32;
         let mut breeding_pods_active = 0u32;
+        let mut breeding_pods_paused = 0u32;
+        let mut breeding_pods_queued = 0u32;
+        let mut gear_workshops_finished = 0u32;
+        let mut gear_workshops_queued = 0u32;
+        let mut unreachable_buildings = 0u32;
 
         for b in &buildings {
             let fin = b.finished == 1;
             let paused = b.paused == 1;
+            if b.reachable == Some(0) && !b.name.contains("Path") {
+                unreachable_buildings += 1;
+            }
             if fin {
                 total_beds += b.max_dwellers.unwrap_or(0);
                 if !paused {
@@ -510,10 +542,22 @@ impl ColonyState {
                 } else {
                     lumber_mills_queued += 1;
                 }
+            } else if b.name.contains("GearWorkshop") {
+                if fin {
+                    gear_workshops_finished += 1;
+                } else {
+                    gear_workshops_queued += 1;
+                }
             } else if b.name.contains("Inventor") && fin {
                 inventors_finished += 1;
-            } else if b.name.starts_with("BreedingPod") && fin && !paused {
-                breeding_pods_active += 1;
+            } else if b.name.starts_with("BreedingPod") {
+                if !fin {
+                    breeding_pods_queued += 1;
+                } else if paused {
+                    breeding_pods_paused += 1;
+                } else {
+                    breeding_pods_active += 1;
+                }
             }
             if b.is_generator == Some(1)
                 || b.name.contains("PowerWheel")
@@ -539,9 +583,46 @@ impl ColonyState {
         let unemployed_adults = healthy_adults as i32 - assigned_total as i32;
         let idle_workers = unemployed_adults.max(0) as u32;
 
-        // Power totals
+        // Wellbeing average from summary or individual beavers
+        let wellbeing_avg = if let Some(wb) = snap
+            .summary
+            .wellbeing
+            .as_ref()
+            .and_then(|v| v.get("average"))
+            .and_then(|v| v.as_f64())
+        {
+            round1(wb)
+        } else {
+            let living: Vec<f64> = snap
+                .beavers
+                .iter()
+                .filter(|b| b.is_bot == 0)
+                .filter_map(|b| b.wellbeing)
+                .collect();
+            if living.is_empty() {
+                0.0
+            } else {
+                round1(living.iter().sum::<f64>() / living.len() as f64)
+            }
+        };
+
+        // Power totals & disconnected network consumer detection
+        let power_network_count = snap.power.len() as u32;
         let power_supply = round1(snap.power.iter().map(|n| n.supply).sum());
         let power_demand = round1(snap.power.iter().map(|n| n.demand).sum());
+        let mut disconnected_power_consumers = 0u32;
+        if power_supply >= 50.0 {
+            for b in &buildings {
+                if b.finished == 1
+                    && b.paused == 0
+                    && b.is_consumer == Some(1)
+                    && b.powered == Some(0)
+                    && power_supply >= b.nominal_power_input.unwrap_or(50.0)
+                {
+                    disconnected_power_consumers += 1;
+                }
+            }
+        }
 
         // Trees & crops
         let grown_trees = snap
@@ -574,6 +655,7 @@ impl ColonyState {
         };
         let forester_unlocked = is_unlocked("Forester.");
         let floodgate_unlocked = is_unlocked("Floodgate.");
+        let gear_workshop_unlocked = is_unlocked("GearWorkshop.");
 
         // Construction queue & cumulative builder ETAs (sorted by priority desc, id asc)
         let mut unfinished: Vec<&Building> = buildings.iter().filter(|b| b.finished == 0).collect();
@@ -647,6 +729,25 @@ impl ColonyState {
                         deficit_hp: round1(power_demand - power_supply),
                     });
                 }
+            }
+        } else if disconnected_power_consumers > 0 {
+            for b in &buildings {
+                if b.finished == 1
+                    && b.paused == 0
+                    && b.is_consumer == Some(1)
+                    && b.powered == Some(0)
+                {
+                    blocked_prerequisites.push(BlockedPrerequisite::DisconnectedPowerNetwork {
+                        consumer: b.name.clone(),
+                    });
+                }
+            }
+        }
+        for b in &buildings {
+            if b.reachable == Some(0) && !b.name.contains("Path") {
+                blocked_prerequisites.push(BlockedPrerequisite::UnreachableSite {
+                    building: b.name.clone(),
+                });
             }
         }
         if river_depth <= 0.05 || river_contamination >= IRRIGATION_POLLUTION_CUTOFF {
@@ -754,6 +855,15 @@ impl ColonyState {
             total_crops,
             grown_crops,
             breeding_pods_active,
+            breeding_pods_paused,
+            breeding_pods_queued,
+            gear_workshops_finished,
+            gear_workshops_queued,
+            gear_workshop_unlocked,
+            unreachable_buildings,
+            disconnected_power_consumers,
+            power_network_count,
+            wellbeing_avg,
             construction_queue,
             blocked_prerequisites,
             active_commitment,
@@ -765,9 +875,10 @@ impl ColonyState {
         format!(
             "FACTION={:?} DAY={} CYCLE={}({}) PHASE={:?} HAZARD_IN={}d(dur {}d) \
              WATER={}({:.1}h,cap={}) FOOD={}({:.1}h) LOG={} PLANK={} GEAR={} SP={} \
-             POP={}({}a/{}c,beds={},free={}) BUILDERS={} SHORTAGE={} IDLE={} \
-             RIVER(d={:.2},c={:.2},up_c={:.2},irrig={}) POWER({:.0}/{:.0}hp) \
-             TREES({}g/{}s,forester={}+{}q) QUEUE={} BLOCKED={}",
+             POP={}({}a/{}c,beds={},free={},wb={:.1}) BUILDERS={} SHORTAGE={} IDLE={} \
+             RIVER(d={:.2},c={:.2},up_c={:.2},irrig={}) POWER({:.0}/{:.0}hp,nets={},disconn={}) \
+             TREES({}g/{}s,forester={}+{}q) GEARS_WS={}+{}q PODS={}a/{}p UNREACH={} \
+             QUEUE={} BLOCKED={}",
             self.faction,
             self.day,
             self.cycle,
@@ -789,6 +900,7 @@ impl ColonyState {
             self.children,
             self.total_beds,
             self.free_beds,
+            self.wellbeing_avg,
             self.active_builders,
             self.worker_shortage,
             self.idle_workers,
@@ -798,10 +910,17 @@ impl ColonyState {
             self.irrigated_tiles,
             self.power_supply,
             self.power_demand,
+            self.power_network_count,
+            self.disconnected_power_consumers,
             self.grown_trees,
             self.sapling_trees,
             self.foresters_finished,
             self.foresters_queued,
+            self.gear_workshops_finished,
+            self.gear_workshops_queued,
+            self.breeding_pods_active,
+            self.breeding_pods_paused,
+            self.unreachable_buildings,
             self.construction_queue.len(),
             self.blocked_prerequisites.len(),
         )
