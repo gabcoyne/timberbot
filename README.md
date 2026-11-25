@@ -33,7 +33,7 @@ Copy and paste the block below into a fresh Grok Bot session pointed at this rep
 You are operating **Timberbot** from the `gabcoyne/timberbot` repository to play and improve a Timberborn 1.1 colony.
 
 ### 1. Ground Yourself in This Repo First
-- Read `docs/connect-and-play.md` (two-machine mod build, `:8085`/`:8086` verification, SSH tunnel vs. bearer-token bind, and `timberbot-mcp` wiring).
+- Read `docs/connect-and-play.md` (prebuilt release ZIP install or maintainer mod packaging, `:8085`/`:8086` verification, SSH tunnel vs. bearer-token bind, and `timberbot-mcp` wiring).
 - Read `skills/README.md` and consult relevant playbooks under `skills/timberborn-*/SKILL.md` before making colony decisions.
 - Respect `docs/mock-fidelity.md` (distinguish verified Timberborn 1.1 values from mock approximations and unverified items).
 
@@ -101,7 +101,7 @@ cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- report --traces
 
 ## Documentation
 
-- **[Connect & Play (2-Machine)](docs/connect-and-play.md)** — Build/install the C# mod against a gaming machine's Timberborn 1.1 `Managed/` DLLs, verify `:8085`/`:8086`, SSH tunnel or bearer-token bind, wire `timberbot-mcp`, smoke test, and run inner/outer loops on real traces.
+- **[Connect & Play (2-Machine)](docs/connect-and-play.md)** — Install `timberbot-mod-*.zip` from GitHub Releases (or build/package via `scripts/package-mod.{ps1,sh}`), verify `:8085`/`:8086`, SSH tunnel or bearer-token bind, wire `timberbot-mcp`, smoke test, and run inner/outer loops on real traces.
 - **[Four-Layer Outer Loop](docs/four-layer-outer-loop.md)** — Layer 1 typed state, Layer 2 faction tactic catalogue & playbooks, Layer 3 trace evals & miss taxonomy, Layer 4 staged drills.
 - **[Mock Fidelity](docs/mock-fidelity.md)** — Honest `verified` / `approximated` / `unverified` audit of Timberborn 1.1 mechanics in `timberbot-mock` and `timberbot-save`.
 - **[Remote Access](docs/remote-access.md)** — SSH tunnel (recommended) vs. opt-in non-loopback `authToken` setup.

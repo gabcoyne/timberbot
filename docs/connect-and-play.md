@@ -29,11 +29,23 @@ End-to-end operator guide for running **Timberborn 1.1** on a separate **Gaming 
 
 ---
 
-## Step 1 — Build & Install the C# Mod on the Gaming Machine
+## Step 1 — Install the C# Mod on the Gaming Machine
 
-Run these commands on the **Gaming Machine** where Timberborn 1.1 is installed (requires the .NET SDK matching `timberbot/src/Timberbot.csproj`; see [Dev Environment](devenv.md)).
+### 1.1 Default Install (Recommended): Prebuilt Release ZIP
 
-### 1.1 Locate Timberborn's `Managed/` directory
+1. Download the latest `timberbot-mod-<version>.zip` from [GitHub Releases](https://github.com/gabcoyne/timberbot/releases).
+2. Extract the archive into Timberborn's `Mods/` directory so the resulting layout is `Mods/Timberbot/manifest.json`, `Mods/Timberbot/Timberbot.dll`, and `Mods/Timberbot/settings.json`:
+   - **Windows:** `%USERPROFILE%\Documents\Timberborn\Mods\`
+   - **Linux:** `~/.config/unity3d/Mechanistry/Timberborn/Mods/`
+   - **macOS:** `~/Library/Application Support/Mechanistry/Timberborn/Mods/`
+
+> The release ZIP ships **only** Timberbot's own GPL-3.0 artifacts (`Timberbot.dll`, `manifest.json`, `settings.json`, `thumbnail.png`, `LICENSE`, `docs/`). Zero Timberborn, Unity, or Bindito `Managed/` DLLs are ever packaged.
+
+### 1.2 Maintainer / First Build on the Game Machine (Build, Package & Upload)
+
+For the first release build (or after updating to a new Timberborn 1.1 patch), run the single-command packaging script on the **Gaming Machine** where Timberborn 1.1 and the .NET SDK are installed (see [Dev Environment](devenv.md)).
+
+Default Timberborn `Managed/` paths:
 
 | OS | Default Timberborn `Managed/` path |
 | --- | --- |
@@ -41,18 +53,30 @@ Run these commands on the **Gaming Machine** where Timberborn 1.1 is installed (
 | **Linux (Steam)** | `~/.local/share/Steam/steamapps/common/Timberborn/Timberborn_Data/Managed` |
 | **macOS (Steam)** | `~/Library/Application Support/Steam/steamapps/common/Timberborn/Timberborn.app/Contents/Resources/Data/Managed` |
 
-### 1.2 Build against that machine's DLLs
+**Build & package in one command** (compiles `Release` with `-p:GameManagedDir=...`, excludes all game `Managed/` DLLs, audits that `Timberbot.dll` is the only `.dll`, and emits `dist/timberbot-mod-<version>.zip`):
 
-```bash
-cd timberbot/src
-dotnet build -c Release -p:GameManagedDir="/path/to/Timberborn/Timberborn_Data/Managed"
+```powershell
+# Windows (PowerShell)
+.\scripts\package-mod.ps1 -GameManagedDir "C:\Program Files (x86)\Steam\steamapps\common\Timberborn\Timberborn_Data\Managed"
 ```
 
-The post-build target auto-deploys `Timberbot.dll`, `manifest.json`, `settings.json`, and docs into Timberborn's `Mods/Timberbot` folder. If your Timberborn user data folder is non-standard, copy the build output (`Timberbot.dll`, `manifest.json`, `settings.json`) manually into:
+```bash
+# macOS / Linux
+./scripts/package-mod.sh --game-managed-dir "/path/to/Timberborn/Timberborn_Data/Managed"
+```
 
-- **Windows:** `%USERPROFILE%\Documents\Timberborn\Mods\Timberbot\`
-- **Linux:** `~/.config/unity3d/Mechanistry/Timberborn/Mods/Timberbot/`
-- **macOS:** `~/Library/Application Support/Mechanistry/Timberborn/Mods/Timberbot/`
+*(If Timberborn is installed at a default Steam path, you can omit `-GameManagedDir` / `--game-managed-dir` and the script auto-detects it.)*
+
+**Install locally or publish to GitHub Releases:**
+
+- **Install locally:** extract `dist/timberbot-mod-<version>.zip` into your `Mods/` folder above.
+- **Upload via GitHub CLI (`gh`):**
+  ```bash
+  gh release create v0.8.0 dist/timberbot-mod-0.8.0.zip \
+    --title "Timberbot Mod v0.8.0" \
+    --notes "GPL-3.0 Timberbot C# mod built against Timberborn 1.1 Managed/ DLLs (excludes all game DLLs)."
+  ```
+- **Upload via GitHub Web UI:** open **Releases → Draft a new release**, tag `v0.8.0`, and attach `dist/timberbot-mod-0.8.0.zip`.
 
 ### 1.3 Enable & load a save
 
