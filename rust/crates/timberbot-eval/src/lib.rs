@@ -15,7 +15,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use timberbot_state::ColonyState;
 use timberbot_tactics::{
-    decide, CatalogueEntry, Decision, OutcomeStatus, PlaybookOutcome, TacticId,
+    decide, decide_with_backend, CatalogueEntry, Decision, DecisionSource, OutcomeStatus,
+    PlaybookOutcome, PolicyBackend, TacticId,
 };
 
 /// Single Layer 3 decision trace row written to JSONL during live or drill execution.
@@ -32,6 +33,9 @@ pub struct DecisionTrace {
     /// `true` if `latency_ms` exceeded the stale threshold or state changed mid-decision.
     pub stale: bool,
     pub latency_ms: u64,
+    /// Optional inner-loop provenance (`Baseline`, `Model`, or `Fallback`).
+    #[serde(default)]
+    pub decision_source: Option<DecisionSource>,
 }
 
 impl DecisionTrace {
@@ -43,6 +47,29 @@ impl DecisionTrace {
         playbook_outcome: PlaybookOutcome,
         latency_ms: u64,
         stale_threshold_ms: u64,
+    ) -> Self {
+        Self::build_with_source(
+            session,
+            step_index,
+            typed_state,
+            decision,
+            playbook_outcome,
+            latency_ms,
+            latency_ms > stale_threshold_ms,
+            Some(DecisionSource::Baseline),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_with_source(
+        session: impl Into<String>,
+        step_index: u32,
+        typed_state: ColonyState,
+        decision: &Decision,
+        playbook_outcome: PlaybookOutcome,
+        latency_ms: u64,
+        stale: bool,
+        decision_source: Option<DecisionSource>,
     ) -> Self {
         let timestamp_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -57,8 +84,9 @@ impl DecisionTrace {
             chosen_tactic: decision.tactic,
             rationale: decision.rationale.clone(),
             playbook_outcome,
-            stale: latency_ms > stale_threshold_ms,
+            stale,
             latency_ms,
+            decision_source,
         }
     }
 }
@@ -350,6 +378,373 @@ pub fn load_cases(path: impl AsRef<Path>) -> Result<Vec<LabeledCase>> {
     Ok(cases)
 }
 
+pub fn save_cases(path: impl AsRef<Path>, cases: &[LabeledCase]) -> Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    let json = serde_json::to_string_pretty(cases)?;
+    std::fs::write(path, format!("{json}\n"))
+        .with_context(|| format!("write eval cases {}", path.display()))?;
+    Ok(())
+}
+
+/// Async variant of [`evaluate_cases`] that evaluates labeled cases against either the
+/// deterministic baseline or a configured fast-model [`PolicyBackend`].
+pub async fn evaluate_cases_with_backend(
+    cases: &[LabeledCase],
+    backend: &PolicyBackend,
+) -> OfflineEvalReport {
+    let mut results = Vec::with_capacity(cases.len());
+    let mut misses_by_kind: BTreeMap<MissKind, usize> = BTreeMap::new();
+    let mut passed = 0usize;
+
+    for c in cases {
+        let pd = decide_with_backend(&c.typed_state, backend).await;
+        match classify_decision(
+            &c.typed_state,
+            &pd.decision,
+            c.expected_tactic,
+            c.recorded_outcome.as_ref(),
+        ) {
+            None => {
+                passed += 1;
+                results.push(CaseEvalResult {
+                    id: c.id.clone(),
+                    description: c.description.clone(),
+                    expected: c.expected_tactic,
+                    actual: pd.decision.tactic,
+                    passed: true,
+                    miss_kind: None,
+                    detail: pd.decision.rationale,
+                });
+            }
+            Some((kind, detail)) => {
+                *misses_by_kind.entry(kind).or_insert(0) += 1;
+                results.push(CaseEvalResult {
+                    id: c.id.clone(),
+                    description: c.description.clone(),
+                    expected: c.expected_tactic,
+                    actual: pd.decision.tactic,
+                    passed: false,
+                    miss_kind: Some(kind),
+                    detail,
+                });
+            }
+        }
+    }
+
+    let total = cases.len();
+    let failed = total.saturating_sub(passed);
+    let accuracy_pct = if total == 0 {
+        100.0
+    } else {
+        ((passed as f64) / (total as f64) * 1000.0).round() / 10.0
+    };
+
+    OfflineEvalReport {
+        total,
+        passed,
+        failed,
+        accuracy_pct,
+        misses_by_kind,
+        results,
+    }
+}
+
+/// Single surfaced outer-loop miss attributed to one of Ryan Perry's 4 layers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SurfacedMiss {
+    pub source: String,
+    pub step_index: u32,
+    pub day: u32,
+    pub layer: MissKind,
+    pub chosen_tactic: TacticId,
+    pub suggested_tactic: TacticId,
+    pub stale: bool,
+    pub fallback: bool,
+    pub detail: String,
+}
+
+/// Outer-loop triage report grouping trace & optional offline-eval misses by layer.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MissSurfaceReport {
+    pub total_traces: usize,
+    pub total_misses: usize,
+    pub stale_traces: usize,
+    pub fallback_traces: usize,
+    pub misses_by_layer: BTreeMap<MissKind, usize>,
+    pub misses_by_tactic: BTreeMap<String, usize>,
+    pub misses: Vec<SurfacedMiss>,
+}
+
+/// Inspect recorded traces (and optional labeled offline cases) to surface every miss
+/// grouped by layer (`StateBug`, `MissingCatalogueTactic`, `PickError`, `PlaybookBug`).
+pub fn surface_misses(
+    traces: &[DecisionTrace],
+    cases: Option<&[LabeledCase]>,
+) -> MissSurfaceReport {
+    let mut misses_by_layer: BTreeMap<MissKind, usize> = BTreeMap::new();
+    let mut misses_by_tactic: BTreeMap<String, usize> = BTreeMap::new();
+    let mut misses = Vec::new();
+    let mut stale_traces = 0usize;
+    let mut fallback_traces = 0usize;
+
+    for t in traces {
+        let is_fallback = t
+            .decision_source
+            .as_ref()
+            .is_some_and(DecisionSource::is_fallback);
+        if t.stale {
+            stale_traces += 1;
+        }
+        if is_fallback {
+            fallback_traces += 1;
+        }
+
+        let inv_errors = t.typed_state.validate_invariants();
+        if !inv_errors.is_empty() {
+            let layer = MissKind::StateBug;
+            *misses_by_layer.entry(layer).or_insert(0) += 1;
+            *misses_by_tactic
+                .entry(t.chosen_tactic.as_str().to_string())
+                .or_insert(0) += 1;
+            misses.push(SurfacedMiss {
+                source: t.drill_or_session.clone(),
+                step_index: t.step_index,
+                day: t.typed_state.day,
+                layer,
+                chosen_tactic: t.chosen_tactic,
+                suggested_tactic: decide(&t.typed_state).tactic,
+                stale: t.stale,
+                fallback: is_fallback,
+                detail: format!("Layer 1 state invariant failed: {}", inv_errors.join("; ")),
+            });
+            continue;
+        }
+
+        let baseline = decide(&t.typed_state);
+        if t.playbook_outcome.status == OutcomeStatus::Failed {
+            let layer = MissKind::PlaybookBug;
+            *misses_by_layer.entry(layer).or_insert(0) += 1;
+            *misses_by_tactic
+                .entry(t.chosen_tactic.as_str().to_string())
+                .or_insert(0) += 1;
+            misses.push(SurfacedMiss {
+                source: t.drill_or_session.clone(),
+                step_index: t.step_index,
+                day: t.typed_state.day,
+                layer,
+                chosen_tactic: t.chosen_tactic,
+                suggested_tactic: baseline.tactic,
+                stale: t.stale,
+                fallback: is_fallback,
+                detail: format!(
+                    "Playbook '{}' failed: {}",
+                    t.chosen_tactic.as_str(),
+                    t.playbook_outcome
+                        .error
+                        .as_deref()
+                        .unwrap_or("unknown error")
+                ),
+            });
+            continue;
+        }
+
+        if t.chosen_tactic != baseline.tactic {
+            let baseline_enabled_in_trace = t
+                .available_catalogue
+                .iter()
+                .find(|e| e.tactic == baseline.tactic)
+                .is_some_and(|e| e.enabled);
+            let layer = if baseline_enabled_in_trace {
+                MissKind::PickError
+            } else {
+                MissKind::MissingCatalogueTactic
+            };
+            *misses_by_layer.entry(layer).or_insert(0) += 1;
+            *misses_by_tactic
+                .entry(t.chosen_tactic.as_str().to_string())
+                .or_insert(0) += 1;
+            misses.push(SurfacedMiss {
+                source: t.drill_or_session.clone(),
+                step_index: t.step_index,
+                day: t.typed_state.day,
+                layer,
+                chosen_tactic: t.chosen_tactic,
+                suggested_tactic: baseline.tactic,
+                stale: t.stale,
+                fallback: is_fallback,
+                detail: format!(
+                    "Trace picked '{}', baseline suggests '{}' ({})",
+                    t.chosen_tactic.as_str(),
+                    baseline.tactic.as_str(),
+                    baseline.rationale
+                ),
+            });
+        }
+    }
+
+    if let Some(labeled) = cases {
+        let report = evaluate_cases(labeled);
+        for r in report.results.into_iter().filter(|r| !r.passed) {
+            if let Some(layer) = r.miss_kind {
+                *misses_by_layer.entry(layer).or_insert(0) += 1;
+                *misses_by_tactic
+                    .entry(r.actual.as_str().to_string())
+                    .or_insert(0) += 1;
+                misses.push(SurfacedMiss {
+                    source: format!("case:{}", r.id),
+                    step_index: 0,
+                    day: 0,
+                    layer,
+                    chosen_tactic: r.actual,
+                    suggested_tactic: r.expected,
+                    stale: false,
+                    fallback: false,
+                    detail: r.detail,
+                });
+            }
+        }
+    }
+
+    MissSurfaceReport {
+        total_traces: traces.len(),
+        total_misses: misses.len(),
+        stale_traces,
+        fallback_traces,
+        misses_by_layer,
+        misses_by_tactic,
+        misses,
+    }
+}
+
+/// Generate deduplicated [`LabeledCase`] candidates from failing, drifted, stale, or fallback
+/// trace rows so outer-loop hill climbing turns live misses into permanent offline eval cases.
+pub fn harvest_cases_from_traces(
+    traces: &[DecisionTrace],
+    existing: &[LabeledCase],
+) -> Vec<LabeledCase> {
+    let mut seen_ids: std::collections::BTreeSet<String> =
+        existing.iter().map(|c| c.id.clone()).collect();
+    let mut harvested = Vec::new();
+
+    for t in traces {
+        let inv_bad = !t.typed_state.validate_invariants().is_empty();
+        let playbook_failed = t.playbook_outcome.status == OutcomeStatus::Failed;
+        let baseline = decide(&t.typed_state);
+        let drifted = t.chosen_tactic != baseline.tactic;
+        let is_fallback = t
+            .decision_source
+            .as_ref()
+            .is_some_and(DecisionSource::is_fallback);
+
+        if !(inv_bad || playbook_failed || drifted || t.stale || is_fallback) {
+            continue;
+        }
+
+        let reason_tag = if inv_bad {
+            "state-bug"
+        } else if playbook_failed {
+            "playbook-fail"
+        } else if drifted {
+            "pick-drift"
+        } else if t.stale {
+            "stale"
+        } else {
+            "fallback"
+        };
+
+        let slug: String = t
+            .drill_or_session
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+        let id = format!("harvested-{slug}-s{}-{reason_tag}", t.step_index);
+        if !seen_ids.insert(id.clone()) {
+            continue;
+        }
+
+        harvested.push(LabeledCase {
+            id,
+            description: format!(
+                "Harvested from '{}' step {} (day {}, {}): trace picked '{}', baseline '{}'",
+                t.drill_or_session,
+                t.step_index,
+                t.typed_state.day,
+                reason_tag,
+                t.chosen_tactic.as_str(),
+                baseline.tactic.as_str(),
+            ),
+            typed_state: t.typed_state.clone(),
+            expected_tactic: baseline.tactic,
+            recorded_outcome: if playbook_failed {
+                Some(t.playbook_outcome.clone())
+            } else {
+                None
+            },
+        });
+    }
+
+    harvested
+}
+
+/// Regression & hill-climb comparison between a baseline and candidate [`OfflineEvalReport`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RegressionComparison {
+    pub baseline_passed: usize,
+    pub current_passed: usize,
+    pub total_compared: usize,
+    pub accuracy_delta_pct: f64,
+    pub newly_passing: Vec<String>,
+    pub newly_failing: Vec<String>,
+    pub regressed: bool,
+}
+
+pub fn compare_against_baseline(
+    baseline: &OfflineEvalReport,
+    current: &OfflineEvalReport,
+) -> RegressionComparison {
+    let base_map: BTreeMap<&str, bool> = baseline
+        .results
+        .iter()
+        .map(|r| (r.id.as_str(), r.passed))
+        .collect();
+    let mut newly_passing = Vec::new();
+    let mut newly_failing = Vec::new();
+    let mut total_compared = 0usize;
+
+    for r in &current.results {
+        if let Some(&was_pass) = base_map.get(r.id.as_str()) {
+            total_compared += 1;
+            if !was_pass && r.passed {
+                newly_passing.push(r.id.clone());
+            } else if was_pass && !r.passed {
+                newly_failing.push(r.id.clone());
+            }
+        }
+    }
+
+    let delta = ((current.accuracy_pct - baseline.accuracy_pct) * 10.0).round() / 10.0;
+    RegressionComparison {
+        baseline_passed: baseline.passed,
+        current_passed: current.passed,
+        total_compared,
+        accuracy_delta_pct: delta,
+        newly_passing,
+        newly_failing: newly_failing.clone(),
+        regressed: !newly_failing.is_empty() || current.accuracy_pct < baseline.accuracy_pct,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,5 +918,85 @@ mod tests {
         assert_eq!(replay.playbook_failure_count, 0);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn surfaces_misses_by_layer_harvests_cases_and_detects_regressions() {
+        let s = base_state();
+        let d = decide(&s);
+
+        // Trace 1: PlaybookBug
+        let t_pb = DecisionTrace::build_with_source(
+            "live-session-1",
+            1,
+            s.clone(),
+            &d,
+            PlaybookOutcome {
+                tactic: d.tactic,
+                status: OutcomeStatus::Failed,
+                steps_executed: Vec::new(),
+                error: Some("409 game_not_ready".to_string()),
+            },
+            45,
+            false,
+            Some(DecisionSource::Model {
+                model: "fast-model".to_string(),
+            }),
+        );
+
+        // Trace 2: PickError (model chose SecureEarlyWater instead of HoldAndMonitor)
+        let mut d_wrong = d.clone();
+        d_wrong.tactic = TacticId::SecureEarlyWater;
+        let t_pick = DecisionTrace::build_with_source(
+            "live-session-1",
+            2,
+            s.clone(),
+            &d_wrong,
+            PlaybookOutcome {
+                tactic: TacticId::SecureEarlyWater,
+                status: OutcomeStatus::Succeeded,
+                steps_executed: vec!["place SmallTank".to_string()],
+                error: None,
+            },
+            1500,
+            true,
+            Some(DecisionSource::Fallback {
+                model: "fast-model".to_string(),
+                reason: "stale".to_string(),
+            }),
+        );
+
+        let report = surface_misses(&[t_pb.clone(), t_pick.clone()], None);
+        assert_eq!(report.total_traces, 2);
+        assert_eq!(report.total_misses, 2);
+        assert_eq!(report.stale_traces, 1);
+        assert_eq!(report.fallback_traces, 1);
+        assert_eq!(report.misses_by_layer.get(&MissKind::PlaybookBug), Some(&1));
+        assert_eq!(report.misses_by_layer.get(&MissKind::PickError), Some(&1));
+
+        let harvested = harvest_cases_from_traces(&[t_pb, t_pick], &[]);
+        assert_eq!(harvested.len(), 2);
+        assert!(harvested[0].id.contains("playbook-fail"));
+        assert!(harvested[1].id.contains("pick-drift"));
+        assert_eq!(harvested[1].expected_tactic, TacticId::HoldAndMonitor);
+
+        // Regression comparison: dropping from 1/1 -> 0/1 flags regressed=true
+        let base_report = evaluate_cases(&[LabeledCase {
+            id: "c1".to_string(),
+            description: "healthy".to_string(),
+            typed_state: s.clone(),
+            expected_tactic: TacticId::HoldAndMonitor,
+            recorded_outcome: None,
+        }]);
+        let bad_report = evaluate_cases(&[LabeledCase {
+            id: "c1".to_string(),
+            description: "healthy".to_string(),
+            typed_state: s,
+            expected_tactic: TacticId::SecureEarlyWater,
+            recorded_outcome: None,
+        }]);
+        let cmp = compare_against_baseline(&base_report, &bad_report);
+        assert!(cmp.regressed);
+        assert_eq!(cmp.newly_failing, vec!["c1".to_string()]);
     }
 }

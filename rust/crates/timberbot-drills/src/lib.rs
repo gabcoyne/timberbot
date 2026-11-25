@@ -9,13 +9,20 @@ use std::time::Instant;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use timberbot_client::{ClientConfig, TimberbotClient};
-use timberbot_eval::{DecisionTrace, TraceLogger};
+use timberbot_eval::{
+    compare_against_baseline, evaluate_cases_with_backend, load_cases, DecisionTrace,
+    OfflineEvalReport, RegressionComparison, TraceLogger,
+};
 use timberbot_mock::data::Difficulty;
 use timberbot_mock::sim::{HazardKind, ScenarioBuilding, ScenarioConfig};
 use timberbot_mock::{MockServerConfig, RunningMockServer};
 use timberbot_protocol::http::{Orientation, Priority};
 use timberbot_state::{ColonyState, Commitment};
-use timberbot_tactics::{run_four_layer_tick, OutcomeStatus, TacticId};
+use timberbot_tactics::{run_four_layer_tick_with_backend, OutcomeStatus, PolicyBackend, TacticId};
+
+tokio::task_local! {
+    static ACTIVE_BACKEND: PolicyBackend;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DrillResult {
@@ -102,11 +109,16 @@ async fn run_drill_sim(
     let mut max_paused_pods = 0u32;
     let mut last_state: Option<ColonyState> = None;
 
+    let backend = ACTIVE_BACKEND.try_with(Clone::clone).unwrap_or_default();
+
     for step_idx in 0..steps {
         let t0 = Instant::now();
-        let (state, decision, outcome, next_commit) =
-            run_four_layer_tick(&client, commitment.take()).await?;
-        let latency_ms = t0.elapsed().as_millis() as u64;
+        let (state, policy_decision, outcome, next_commit) =
+            run_four_layer_tick_with_backend(&client, commitment.take(), &backend).await?;
+        let total_latency_ms = t0.elapsed().as_millis() as u64;
+        let decision = policy_decision.decision;
+        let latency_ms = policy_decision.latency_ms.max(total_latency_ms);
+        let stale = policy_decision.stale || latency_ms > 500;
 
         *tactics_used
             .entry(decision.tactic.as_str().to_string())
@@ -120,14 +132,15 @@ async fn run_drill_sim(
         max_paused_pods = max_paused_pods.max(state.breeding_pods_paused);
 
         if let Some(ref mut log) = logger {
-            let trace = DecisionTrace::build(
+            let trace = DecisionTrace::build_with_source(
                 drill_name,
                 step_idx,
                 state.clone(),
                 &decision,
                 outcome,
                 latency_ms,
-                500,
+                stale,
+                Some(policy_decision.source),
             );
             log.append(&trace)?;
         }
@@ -1135,9 +1148,30 @@ pub async fn drill_multi_crisis_topology_recovery(
     })
 }
 
-/// Run all 10 staged drills (or a substring-filtered subset), optionally writing every Layer 3
-/// decision trace to `trace_out`.
+/// Run all 10 staged drills using the deterministic baseline policy.
 pub async fn run_all_drills(
+    filter: Option<&str>,
+    trace_out: Option<&Path>,
+) -> Result<DrillSuiteReport> {
+    run_all_drills_with_backend(filter, trace_out, &PolicyBackend::DeterministicBaseline).await
+}
+
+/// Run all 10 staged drills (or a substring-filtered subset) using the supplied
+/// [`PolicyBackend`] (`DeterministicBaseline` or `ModelBacked`), optionally writing every
+/// Layer 3 decision trace to `trace_out`.
+pub async fn run_all_drills_with_backend(
+    filter: Option<&str>,
+    trace_out: Option<&Path>,
+    backend: &PolicyBackend,
+) -> Result<DrillSuiteReport> {
+    ACTIVE_BACKEND
+        .scope(backend.clone(), async move {
+            run_all_drills_inner(filter, trace_out).await
+        })
+        .await
+}
+
+async fn run_all_drills_inner(
     filter: Option<&str>,
     trace_out: Option<&Path>,
 ) -> Result<DrillSuiteReport> {
@@ -1197,6 +1231,82 @@ pub async fn run_all_drills(
         passed,
         failed,
         pass_rate_pct,
+        drills,
+    })
+}
+
+/// Combined outer-loop promotion gate requiring BOTH Layer 3 offline evals (with zero
+/// regressions against an optional baseline report) AND Layer 4 staged drills to pass.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PromotionGateReport {
+    pub promoted: bool,
+    pub block_reasons: Vec<String>,
+    pub offline: OfflineEvalReport,
+    pub regression: Option<RegressionComparison>,
+    pub drills: DrillSuiteReport,
+}
+
+pub async fn run_promotion_gate(
+    cases_path: &Path,
+    baseline_report_path: Option<&Path>,
+    drill_filter: Option<&str>,
+    trace_out: Option<&Path>,
+    backend: &PolicyBackend,
+) -> Result<PromotionGateReport> {
+    let cases = load_cases(cases_path)?;
+    let offline = evaluate_cases_with_backend(&cases, backend).await;
+
+    let regression = match baseline_report_path {
+        Some(p) => {
+            let raw = std::fs::read_to_string(p)?;
+            let baseline: OfflineEvalReport = serde_json::from_str(&raw)?;
+            Some(compare_against_baseline(&baseline, &offline))
+        }
+        None => None,
+    };
+
+    let drills = run_all_drills_with_backend(drill_filter, trace_out, backend).await?;
+
+    let mut block_reasons = Vec::new();
+    if offline.failed > 0 {
+        block_reasons.push(format!(
+            "offline eval gate failed: {}/{} passed ({:.1}%)",
+            offline.passed, offline.total, offline.accuracy_pct
+        ));
+    }
+    if let Some(ref reg) = regression {
+        if reg.regressed {
+            block_reasons.push(format!(
+                "regression gate failed: newly_failing={:?}, accuracy_delta={:+.1}%",
+                reg.newly_failing, reg.accuracy_delta_pct
+            ));
+        }
+    }
+    if drills.failed > 0 {
+        let failed_names: Vec<&str> = drills
+            .drills
+            .iter()
+            .filter(|d| !d.passed)
+            .map(|d| d.name.as_str())
+            .collect();
+        block_reasons.push(format!(
+            "staged drills gate failed: {}/{} passed (failed: {:?})",
+            drills.passed, drills.total, failed_names
+        ));
+    }
+    if drills
+        .drills
+        .iter()
+        .any(|d| d.deaths > 0 || d.playbook_failures > 0)
+    {
+        block_reasons.push("staged drills recorded beaver deaths or playbook failures".to_string());
+    }
+
+    Ok(PromotionGateReport {
+        promoted: block_reasons.is_empty(),
+        block_reasons,
+        offline,
+        regression,
         drills,
     })
 }

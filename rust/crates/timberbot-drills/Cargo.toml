@@ -19,3 +19,6 @@ timberbot-protocol.workspace = true
 timberbot-state.workspace = true
 timberbot-tactics.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+axum.workspace = true

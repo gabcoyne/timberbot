@@ -9,7 +9,13 @@ description = "Layer 2 faction-specific tactic catalogue, pure decide() policy, 
 
 [dependencies]
 anyhow.workspace = true
+reqwest.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 timberbot-client.workspace = true
 timberbot-protocol.workspace = true
 timberbot-state.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio.workspace = true

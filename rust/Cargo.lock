@@ -1462,6 +1462,7 @@ name = "timberbot-drills"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "clap",
  "serde",
  "serde_json",
@@ -1556,10 +1557,14 @@ name = "timberbot-tactics"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
+ "reqwest",
  "serde",
+ "serde_json",
  "timberbot-client",
  "timberbot-protocol",
  "timberbot-state",
+ "tokio",
 ]
 
 [[package]]

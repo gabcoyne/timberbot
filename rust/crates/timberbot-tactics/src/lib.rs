@@ -1,6 +1,8 @@
 //! Layer 2 (Ryan Perry 4-layer model): faction-specific tactic catalogue, pure `decide()`
-//! selector, multi-day commitments, lead-time & prerequisite checks, and deterministic
-//! step-by-step playbook execution.
+//! selector, configurable fast-model [`llm::decide_with_backend`], multi-day commitments,
+//! lead-time & prerequisite checks, and deterministic step-by-step playbook execution.
+
+pub mod llm;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -12,6 +14,11 @@ use timberbot_protocol::http::{
 use timberbot_state::{
     estimate_build_work_hours, ColonyState, Commitment, Faction, ModSnapshot, WeatherPhase,
     HAUL_ITEMS_PER_BUILDER_HOUR, IRRIGATION_POLLUTION_CUTOFF,
+};
+
+pub use llm::{
+    build_decision_prompt, decide_with_backend, validate_model_payload, DecisionSource,
+    ModelDecisionPayload, ModelPolicyConfig, PolicyBackend, PolicyDecision,
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -1564,6 +1571,29 @@ pub async fn run_four_layer_tick(
         _ => decision.commitment.clone(),
     };
     Ok((state, decision, outcome, next_commitment))
+}
+
+/// Configurable inner-loop tick using either [`PolicyBackend::DeterministicBaseline`] or
+/// [`PolicyBackend::ModelBacked`] (with automatic deterministic fallback).
+pub async fn run_four_layer_tick_with_backend(
+    client: &TimberbotClient,
+    active_commitment: Option<Commitment>,
+    backend: &PolicyBackend,
+) -> Result<(
+    ColonyState,
+    PolicyDecision,
+    PlaybookOutcome,
+    Option<Commitment>,
+)> {
+    let snap = ModSnapshot::fetch(client).await?;
+    let state = ColonyState::from_snapshot(&snap, active_commitment);
+    let policy_decision = decide_with_backend(&state, backend).await;
+    let outcome = execute_tactic(client, &state, &policy_decision.decision).await;
+    let next_commitment = match outcome.status {
+        OutcomeStatus::Failed => None,
+        _ => policy_decision.decision.commitment.clone(),
+    };
+    Ok((state, policy_decision, outcome, next_commitment))
 }
 
 fn round2(v: f64) -> f64 {
