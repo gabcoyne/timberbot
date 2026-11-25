@@ -7,8 +7,8 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use timberbot_drills::{run_all_drills_with_backend, run_promotion_gate};
 use timberbot_eval::{
-    evaluate_cases_with_backend, harvest_cases_from_traces, load_cases, read_traces, replay_traces,
-    save_cases, surface_misses,
+    build_run_analytics, evaluate_cases_with_backend, harvest_cases_from_traces, load_cases,
+    read_traces, replay_traces, save_cases, surface_misses, write_analytics_bundle,
 };
 use timberbot_tactics::{ModelPolicyConfig, PolicyBackend};
 
@@ -131,6 +131,15 @@ enum Command {
         trace_out: Option<PathBuf>,
         #[command(flatten)]
         backend: BackendArgs,
+    },
+    /// Generate end-of-run analytics & interactive replay bundle (analytics.json, report.md, replay.html)
+    Report {
+        /// Path to JSONL trace file
+        #[arg(long)]
+        traces: PathBuf,
+        /// Output directory for analytics.json, report.md, and replay.html
+        #[arg(long, default_value = "target/timberbot-report")]
+        out_dir: PathBuf,
     },
 }
 
@@ -344,6 +353,28 @@ async fn main() -> Result<()> {
             }
             if !report.promoted {
                 std::process::exit(1);
+            }
+        }
+        Command::Report { traces, out_dir } => {
+            let rows = read_traces(&traces)?;
+            let analytics = build_run_analytics(&rows);
+            write_analytics_bundle(&analytics, &out_dir)?;
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&analytics)?);
+            } else {
+                println!("Analytics & Replay Bundle written -> {}", out_dir.display());
+                println!("  JSON:     {}", out_dir.join("analytics.json").display());
+                println!("  Markdown: {}", out_dir.join("report.md").display());
+                println!("  HTML:     {}", out_dir.join("replay.html").display());
+                println!(
+                    "  Steps={} | Latency p50={}ms p95={}ms | Stale={} ({:.1}%) | Misses={}",
+                    analytics.total_steps,
+                    analytics.latency.p50_ms,
+                    analytics.latency.p95_ms,
+                    analytics.latency.stale_count,
+                    analytics.latency.stale_rate_pct,
+                    analytics.total_misses
+                );
             }
         }
     }

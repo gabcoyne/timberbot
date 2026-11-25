@@ -5,6 +5,8 @@
 //! - [`MissKind::PickError`] — Layer 2 expected tactic WAS enabled, but `decide()` picked another tactic (Prompt/Goal/Policy error).
 //! - [`MissKind::PlaybookBug`] — Layer 2 `decide()` chose the right tactic, but playbook execution failed.
 
+pub mod analytics;
+
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -17,6 +19,11 @@ use timberbot_state::ColonyState;
 use timberbot_tactics::{
     decide, decide_with_backend, CatalogueEntry, Decision, DecisionSource, OutcomeStatus,
     PlaybookOutcome, PolicyBackend, TacticId,
+};
+
+pub use analytics::{
+    build_run_analytics, render_html_replay, render_markdown_report, write_analytics_bundle,
+    LatencySummary, ReplayFrame, RunAnalytics, TacticStat, TimelinePoint,
 };
 
 /// Single Layer 3 decision trace row written to JSONL during live or drill execution.
@@ -998,5 +1005,81 @@ mod tests {
         let cmp = compare_against_baseline(&base_report, &bad_report);
         assert!(cmp.regressed);
         assert_eq!(cmp.newly_failing, vec!["c1".to_string()]);
+    }
+
+    #[test]
+    fn builds_and_renders_json_markdown_and_html_analytics_bundle() {
+        let mut s1 = base_state();
+        s1.day = 1;
+        s1.wellbeing_avg = 7.5;
+        let d1 = decide(&s1);
+        let t1 = DecisionTrace::build_with_source(
+            "analytics-test",
+            0,
+            s1,
+            &d1,
+            PlaybookOutcome {
+                tactic: d1.tactic,
+                status: OutcomeStatus::NoOp,
+                steps_executed: Vec::new(),
+                error: None,
+            },
+            15,
+            false,
+            Some(DecisionSource::Baseline),
+        );
+
+        let mut s2 = base_state();
+        s2.day = 2;
+        s2.population = 14;
+        s2.water_stock = 260;
+        s2.food_stock = 240;
+        s2.wellbeing_avg = 9.5;
+        let d2 = decide(&s2);
+        let t2 = DecisionTrace::build_with_source(
+            "analytics-test",
+            1,
+            s2,
+            &d2,
+            PlaybookOutcome {
+                tactic: d2.tactic,
+                status: OutcomeStatus::Succeeded,
+                steps_executed: vec!["monitor".to_string()],
+                error: None,
+            },
+            45,
+            false,
+            Some(DecisionSource::Model {
+                model: "fast-model".to_string(),
+            }),
+        );
+
+        let analytics = build_run_analytics(&[t1, t2]);
+        assert_eq!(analytics.total_steps, 2);
+        assert_eq!(analytics.min_population, 12);
+        assert_eq!(analytics.max_population, 14);
+        assert_eq!(analytics.mean_wellbeing, 8.5);
+        assert_eq!(analytics.latency.min_ms, 15);
+        assert_eq!(analytics.latency.max_ms, 45);
+        assert_eq!(analytics.frames.len(), 2);
+        assert_eq!(analytics.timeline.len(), 2);
+
+        let dir =
+            std::env::temp_dir().join(format!("timberbot-analytics-bundle-{}", std::process::id()));
+        write_analytics_bundle(&analytics, &dir).expect("write analytics bundle");
+
+        let json_txt = std::fs::read_to_string(dir.join("analytics.json")).unwrap();
+        let md_txt = std::fs::read_to_string(dir.join("report.md")).unwrap();
+        let html_txt = std::fs::read_to_string(dir.join("replay.html")).unwrap();
+
+        let parsed: RunAnalytics = serde_json::from_str(&json_txt).unwrap();
+        assert_eq!(parsed.total_steps, 2);
+        assert!(md_txt.contains("# Timberbot Run Analytics & Replay Summary"));
+        assert!(md_txt.contains("hold_and_monitor"));
+        assert!(html_txt.contains("Interactive Frame Replay"));
+        assert!(html_txt.contains("<svg"));
+        assert!(html_txt.contains("analytics-data"));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

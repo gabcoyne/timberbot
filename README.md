@@ -8,7 +8,7 @@
 
 > Fork of [impuls42/timberbot](https://github.com/impuls42/timberbot), which itself is a modified fork of [abix-/TimberbornMods](https://github.com/abix-/TimberbornMods). Adds a standalone Rust agent toolkit (protocol, async HTTP/WS client, read-only `.timber` save analyzer, deterministic mock server, stdio MCP server, and reference pause-observe-plan-act-verify-unpause agent loop), 20 Grok Bot gameplay playbooks (`skills/`), and offline end-to-end colony scenarios without changing the upstream C# mod HTTP/WS contract. All credit for the original mod goes to [abix-](https://github.com/abix-) and [impuls42](https://github.com/impuls42).
 
-[Getting Started](docs/getting-started.md) | [Game Build Compatibility](docs/game-build.md) | [Remote Access](docs/remote-access.md) | [API Reference](docs/api-reference.md) | [WebSocket Protocol](docs/websocket-protocol.md) | [Skills Library](skills/README.md) | [Upstream](https://github.com/impuls42/timberbot)
+[Getting Started](docs/getting-started.md) | [Connect & Play (2-Machine)](docs/connect-and-play.md) | [Game Build Compatibility](docs/game-build.md) | [Remote Access](docs/remote-access.md) | [Four-Layer Outer Loop](docs/four-layer-outer-loop.md) | [Mock Fidelity](docs/mock-fidelity.md) | [API Reference](docs/api-reference.md) | [WebSocket Protocol](docs/websocket-protocol.md) | [Skills Library](skills/README.md) | [Upstream](https://github.com/impuls42/timberbot)
 
 C# mod + Python client that lets AI agents read and control a running Timberborn game over HTTP, with a parallel WebSocket channel for push-style state and events.
 
@@ -66,7 +66,9 @@ cargo run --manifest-path rust/Cargo.toml -p timberbot-mcp -- --save-root scenar
 
 ### Pointing the Bot at a Real Game on Another Machine
 
-Keep the C# mod bound to `127.0.0.1` with stock `settings.json` and tunnel from the bot host over SSH (see [Remote Access](docs/remote-access.md)):
+For the complete two-machine setup — compiling the C# mod against your gaming machine's Timberborn 1.1 `Managed/` DLLs, verifying `:8085`/`:8086`, SSH tunneling or bearer-token LAN exposure, wiring `timberbot-mcp` stdio into Grok Bot / Cursor, read-only smoke tests, inner-loop play, and outer-loop evals/analytics on real traces — see **[Connect & Play](docs/connect-and-play.md)** (and [Remote Access](docs/remote-access.md)).
+
+Quick SSH tunnel from the bot host:
 
 ```bash
 # On the bot machine: forward Timberbot HTTP (:8085), WS (:8086), and optional official HTTP Levers (:8080)

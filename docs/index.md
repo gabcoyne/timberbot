@@ -59,6 +59,10 @@ Timberbot gives Claude, Codex, ChatGPT, or your own scripts complete access to a
 
     Typed state, faction tactic catalogue, JSONL trace evals, staged drills, and the local Grok Bot loop.
 
+- **[Connect & Play (2-Machine)](connect-and-play.md)**
+
+    Build/install the C# mod on a gaming machine, connect over SSH or bearer-token auth, wire `timberbot-mcp`, run smoke tests, inner loop, and outer-loop analytics.
+
 </div>
 
 ---
