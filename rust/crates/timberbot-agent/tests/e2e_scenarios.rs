@@ -32,6 +32,7 @@ async fn start_scenario(file: &str) -> (RunningMockServer, TimberbotClient, Agen
         initial_ready: true,
         tick_interval: None,
         days_per_tick_speed1: 0.25,
+        ..Default::default()
     };
     let server = RunningMockServer::start(cfg, load_scenario(file))
         .await
@@ -158,10 +159,12 @@ async fn incoming_drought_end_to_end_survival() {
 
     let final_summary = client.summary().await.unwrap();
     let d0 = &final_summary.districts[0];
-    assert_eq!(
-        d0.population.total_beavers(),
-        initial_pop,
-        "zero beaver deaths during drought survival"
+    let deaths = server.state.world.lock().unwrap().metrics.deaths;
+    assert_eq!(deaths, 0, "zero beaver deaths during drought survival");
+    assert!(
+        d0.population.total_beavers() >= initial_pop,
+        "colony population should not drop during drought survival (before={initial_pop}, after={})",
+        d0.population.total_beavers()
     );
     let water = *d0.resources.get("Water").unwrap_or(&0);
     let food = d0.resources.get("Carrot").copied().unwrap_or(0)

@@ -243,6 +243,14 @@ pub struct Cluster {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct SummaryTrees {
+    pub marked_grown: u32,
+    pub marked_seedling: u32,
+    pub unmarked_grown: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Summary {
     pub settlement: String,
     pub faction: String,
@@ -253,6 +261,10 @@ pub struct Summary {
     pub buildings: BTreeMap<String, u32>,
     #[serde(default)]
     pub crops: Option<SummaryCrops>,
+    #[serde(default)]
+    pub trees: Option<SummaryTrees>,
+    #[serde(default)]
+    pub wellbeing: Option<Value>,
     pub districts: Vec<SummaryDistrict>,
     #[serde(default)]
     pub food_clusters: Vec<Cluster>,
@@ -347,6 +359,10 @@ pub struct PrefabCost {
     pub amount: u32,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrefabInfo {
@@ -359,7 +375,7 @@ pub struct PrefabInfo {
     pub size_z: u32,
     #[serde(default)]
     pub science_cost: u32,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub unlocked: bool,
     #[serde(default)]
     pub cost: Vec<PrefabCost>,
@@ -390,26 +406,54 @@ pub struct MapSize {
     pub z: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TileOccupant {
+    pub name: String,
+    pub z: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TilesRegion {
+    pub x1: i32,
+    pub y1: i32,
+    pub x2: i32,
+    pub y2: i32,
+}
+
+/// Tile entry matching `TimberbotReadV2.CollectTiles` (`format=json`):
+/// `x`, `y`, `terrain`, `water`, `badwater`, `entrance`, `seedling`, `dead`,
+/// `contaminated`, `moist`, `occupants`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TileInfo {
     pub x: i32,
     pub y: i32,
-    pub terrain_height: i32,
+    #[serde(alias = "terrainHeight")]
+    pub terrain: i32,
+    #[serde(default, alias = "waterDepth")]
+    pub water: f64,
+    #[serde(default, alias = "contamination")]
+    pub badwater: f64,
     #[serde(default)]
-    pub water_depth: f64,
+    pub entrance: u8,
     #[serde(default)]
-    pub contamination: f64,
+    pub seedling: u8,
+    #[serde(default)]
+    pub dead: u8,
+    #[serde(default)]
+    pub contaminated: u8,
     #[serde(default)]
     pub moist: u8,
     #[serde(default)]
-    pub occupant: Option<String>,
+    pub occupants: Vec<TileOccupant>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TilesResponse {
     pub map_size: MapSize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<TilesRegion>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tiles: Option<Vec<TileInfo>>,
 }
@@ -542,6 +586,12 @@ pub struct Building {
     #[serde(default)]
     pub alerts: Option<String>,
     #[serde(default)]
+    pub effect_radius: Option<i32>,
+    #[serde(default)]
+    pub is_wonder: Option<u8>,
+    #[serde(default)]
+    pub needs_nutrients: Option<u8>,
+    #[serde(default)]
     pub inventory: BTreeMap<String, i64>,
     #[serde(default)]
     pub recipes: Vec<String>,
@@ -582,7 +632,15 @@ pub struct Beaver {
     #[serde(default)]
     pub workplace: Option<String>,
     #[serde(default)]
-    pub wellbeing: Option<i32>,
+    pub wellbeing: Option<f64>,
+    #[serde(default)]
+    pub overburdened: Option<u8>,
+    #[serde(default)]
+    pub carry_amount: Option<i32>,
+    #[serde(default)]
+    pub carrying: Option<String>,
+    #[serde(default)]
+    pub lifting_capacity: Option<i32>,
     #[serde(default)]
     pub needs: Vec<BeaverNeed>,
 }
@@ -646,10 +704,6 @@ pub struct SetHaulingRequest {
     pub id: i64,
     #[serde(default = "default_true")]
     pub prioritized: bool,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
