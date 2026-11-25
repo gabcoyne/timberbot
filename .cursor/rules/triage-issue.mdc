@@ -1,0 +1,15 @@
+---
+description: Triage a GitHub issue on gabcoyne/timberbot. Classify it, comment the diagnosis and plan, and dispatch a builder. Do not implement the fix in the triage turn.
+alwaysApply: false
+---
+
+# Triage
+
+Follow `docs/sdlc.md`. Triage is a separate worker from the builder, reviewer, and QA. Do not implement the change or open the pull request in this role.
+
+1. Read the issue. Classify it as one of: C# mod, Rust client or MCP, Layer 1 state, Layer 2 tactics, Layer 3 evals, Layer 4 outer loop, skills, or docs.
+2. Comment on the issue with the diagnosis and the plan, then dispatch a builder.
+3. Tell the builder to branch from fresh `main`, open one small pull request targeting `main` (not stacked on an unmerged branch), add a regression test or an offline eval or staged-drill case for the reported failure, and use `Closes #<issue>`.
+4. If the plan touches `timberbot/`, say in the issue comment that the gaming machine must rebuild and upload `timberbot-mod-<version>.zip` with `scripts/package-mod.ps1` or `scripts/package-mod.sh`.
+
+There is no GitHub issue webhook. This Project polls `gabcoyne/timberbot` every 10 minutes for new, reopened, and newly commented issues. Pull request and CI watches stay on open pull requests. Triage starts when that check finds an issue, or when George brings one here.

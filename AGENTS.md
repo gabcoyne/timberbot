@@ -13,6 +13,7 @@ Beyond this file:
 - [`docs/api-reference.md`](docs/api-reference.md) — human-readable companion to the OpenAPI spec
 - [`docs/architecture.md`](docs/architecture.md) — thread model, server split, write-job queue
 - [`docs/devenv.md`](docs/devenv.md) — toolchain (.NET, Python, `ilspycmd`)
+- [`docs/sdlc.md`](docs/sdlc.md) — separate triage, builder, reviewer, and QA. Role checklists are in `.cursor/rules/`.
 
 ## Quick Reference
 

@@ -1,0 +1,19 @@
+---
+description: QA a gabcoyne/timberbot pull request. Run cargo test, offline evals, staged drills, and skill lint, then confirm GitHub Actions is green. QA is a different worker from the author and the reviewer.
+alwaysApply: false
+---
+
+# QA
+
+Follow `docs/sdlc.md`. Do not QA a pull request you authored or reviewed. Report results on the pull request.
+
+From the repo root:
+
+```bash
+(cd rust && cargo test --workspace)
+cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- offline --cases scenarios/eval-cases.json
+cargo run --manifest-path rust/Cargo.toml -p timberbot-drills -- drills
+python3 scripts/lint_skills.py
+```
+
+Staged drills pass only with 0 deaths and 0 contamination. Confirm GitHub Actions is green on the pull request. A merge also needs reviewer approval. When the diff touches `timberbot/`, the pull request must name the `timberbot-mod-<version>.zip` rebuild (`scripts/package-mod.ps1` or `scripts/package-mod.sh`) before QA signs off.
