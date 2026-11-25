@@ -5,6 +5,10 @@ members = [
     "crates/timberbot-client",
     "crates/timberbot-save",
     "crates/timberbot-mock",
+    "crates/timberbot-state",
+    "crates/timberbot-tactics",
+    "crates/timberbot-eval",
+    "crates/timberbot-drills",
     "crates/timberbot-mcp",
     "crates/timberbot-agent",
 ]
@@ -37,4 +41,7 @@ timberbot-protocol = { path = "crates/timberbot-protocol" }
 timberbot-client = { path = "crates/timberbot-client" }
 timberbot-save = { path = "crates/timberbot-save" }
 timberbot-mock = { path = "crates/timberbot-mock" }
+timberbot-state = { path = "crates/timberbot-state" }
+timberbot-tactics = { path = "crates/timberbot-tactics" }
+timberbot-eval = { path = "crates/timberbot-eval" }
 timberbot-agent = { path = "crates/timberbot-agent" }

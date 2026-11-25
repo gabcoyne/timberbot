@@ -1,0 +1,1345 @@
+//! Layer 4 (Ryan Perry 4-layer model): staged drill suite running the 4-layer loop
+//! (`timberbot-state` -> `timberbot-tactics` -> `timberbot-eval`) against `timberbot-mock`
+//! with real time-lag, builder queues, and prerequisite chains.
+
+use std::collections::BTreeMap;
+use std::path::Path;
+use std::time::Instant;
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use timberbot_client::{ClientConfig, TimberbotClient};
+use timberbot_eval::{
+    compare_against_baseline, evaluate_cases_with_backend, load_cases, DecisionTrace,
+    OfflineEvalReport, RegressionComparison, TraceLogger,
+};
+use timberbot_mock::data::Difficulty;
+use timberbot_mock::sim::{HazardKind, ScenarioBuilding, ScenarioConfig};
+use timberbot_mock::{MockServerConfig, RunningMockServer};
+use timberbot_protocol::http::{Orientation, Priority};
+use timberbot_state::{ColonyState, Commitment};
+use timberbot_tactics::{run_four_layer_tick_with_backend, OutcomeStatus, PolicyBackend, TacticId};
+
+tokio::task_local! {
+    static ACTIVE_BACKEND: PolicyBackend;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DrillResult {
+    pub name: String,
+    pub description: String,
+    pub passed: bool,
+    pub steps_run: u32,
+    pub final_day: u32,
+    pub deaths: u32,
+    pub contamination_events: u32,
+    pub playbook_failures: u32,
+    pub tactics_used: BTreeMap<String, u32>,
+    pub checks: Vec<DrillCheck>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DrillCheck {
+    pub name: String,
+    pub passed: bool,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DrillSuiteReport {
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub pass_rate_pct: f64,
+    pub drills: Vec<DrillResult>,
+}
+
+struct DrillRunOutcome {
+    final_state: ColonyState,
+    deaths: u32,
+    contamination_events: u32,
+    cycles_completed: u32,
+    playbook_failures: u32,
+    tactics_used: BTreeMap<String, u32>,
+    steps_run: u32,
+    max_intake_contam: f64,
+    min_water_stock: i64,
+    min_food_stock: i64,
+    max_paused_pods: u32,
+}
+
+async fn run_drill_sim(
+    drill_name: &str,
+    scenario: ScenarioConfig,
+    steps: u32,
+    days_per_step: f64,
+    mut logger: Option<&mut TraceLogger>,
+    pre_hook: impl FnOnce(&RunningMockServer),
+) -> Result<DrillRunOutcome> {
+    let server = RunningMockServer::start(
+        MockServerConfig {
+            listen_address: "127.0.0.1".to_string(),
+            http_port: 0,
+            ws_port: 0,
+            lever_port: None,
+            auth_token: String::new(),
+            initial_ready: true,
+            tick_interval: None,
+            days_per_tick_speed1: days_per_step,
+            ..Default::default()
+        },
+        scenario,
+    )
+    .await?;
+    pre_hook(&server);
+
+    let client = TimberbotClient::new(ClientConfig {
+        host: "127.0.0.1".to_string(),
+        http_port: server.http_addr.port(),
+        ws_port: server.ws_addr.port(),
+        auth_token: None,
+    })?;
+
+    let mut commitment: Option<Commitment> = None;
+    let mut tactics_used: BTreeMap<String, u32> = BTreeMap::new();
+    let mut playbook_failures = 0u32;
+    let mut max_intake_contam = 0.0_f64;
+    let mut min_water_stock = i64::MAX;
+    let mut min_food_stock = i64::MAX;
+    let mut max_paused_pods = 0u32;
+    let mut last_state: Option<ColonyState> = None;
+
+    let backend = ACTIVE_BACKEND.try_with(Clone::clone).unwrap_or_default();
+
+    for step_idx in 0..steps {
+        let t0 = Instant::now();
+        let (state, policy_decision, outcome, next_commit) =
+            run_four_layer_tick_with_backend(&client, commitment.take(), &backend).await?;
+        let total_latency_ms = t0.elapsed().as_millis() as u64;
+        let decision = policy_decision.decision;
+        let latency_ms = policy_decision.latency_ms.max(total_latency_ms);
+        let stale = policy_decision.stale || latency_ms > 500;
+
+        *tactics_used
+            .entry(decision.tactic.as_str().to_string())
+            .or_insert(0) += 1;
+        if outcome.status == OutcomeStatus::Failed {
+            playbook_failures += 1;
+        }
+        max_intake_contam = max_intake_contam.max(state.river_contamination);
+        min_water_stock = min_water_stock.min(state.water_stock);
+        min_food_stock = min_food_stock.min(state.food_stock);
+        max_paused_pods = max_paused_pods.max(state.breeding_pods_paused);
+
+        if let Some(ref mut log) = logger {
+            let trace = DecisionTrace::build_with_source(
+                drill_name,
+                step_idx,
+                state.clone(),
+                &decision,
+                outcome,
+                latency_ms,
+                stale,
+                Some(policy_decision.source),
+            );
+            log.append(&trace)?;
+        }
+
+        commitment = next_commit;
+        last_state = Some(state);
+        server.state.step_sim(days_per_step);
+    }
+
+    // Final post-step state read
+    let final_snap = timberbot_state::ModSnapshot::fetch(&client).await?;
+    let final_state = ColonyState::from_snapshot(&final_snap, commitment);
+    max_intake_contam = max_intake_contam.max(final_state.river_contamination);
+    let metrics = server.state.world.lock().unwrap().metrics.clone();
+    server.shutdown();
+
+    let _ = last_state;
+    Ok(DrillRunOutcome {
+        final_state,
+        deaths: metrics.deaths,
+        contamination_events: metrics.contamination_events,
+        cycles_completed: metrics.cycles_completed,
+        playbook_failures,
+        tactics_used,
+        steps_run: steps,
+        max_intake_contam,
+        min_water_stock,
+        min_food_stock,
+        max_paused_pods,
+    })
+}
+
+fn check(name: &str, passed: bool, detail: String) -> DrillCheck {
+    DrillCheck {
+        name: name.to_string(),
+        passed,
+        detail,
+    }
+}
+
+/// Drill 1: 2 days before badtide with an UNBUILT floodgate queued behind a low-priority Lodge.
+/// Tests lead-time urgency, construction queue prioritization, workday boost, and badwater diversion.
+pub async fn drill_badtide_unbuilt_floodgate_2d(
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("Folktails", Difficulty::Normal);
+    cfg.name = "DrillBadtide2dUnbuilt".to_string();
+    cfg.auto_cycle_hazards = false;
+    cfg.cycle = 2;
+    cfg.cycle_day = 11;
+    cfg.temperate_weather_duration = 12; // 2 days until badtide!
+    cfg.hazardous_weather_duration = 4;
+    cfg.is_hazardous = false;
+    cfg.hazard_kind = HazardKind::Badtide;
+    cfg.science = 200;
+    cfg.resources.insert("Water".to_string(), 160);
+    cfg.resources.insert("Carrot".to_string(), 180);
+    cfg.resources.insert("Log".to_string(), 50);
+    cfg.resources.insert("Plank".to_string(), 20);
+    // Replace finished floodgate with an UNFINISHED floodgate + a decoy Lodge ahead of it
+    cfg.buildings.retain(|b| !b.name.contains("Floodgate"));
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Lodge.Folktails".to_string(),
+        x: 18,
+        y: 18,
+        z: 2,
+        orientation: Orientation::South,
+        finished: false,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Floodgate.Folktails".to_string(),
+        x: 10,
+        y: 12,
+        z: 1,
+        orientation: Orientation::South,
+        finished: false,
+        paused: false,
+        workers: None,
+        floodgate_height: Some(0.0),
+        max_height: Some(1.0),
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+
+    // Run 30 steps * 0.25d = 7.5 days (2d warning + 4d badtide + 1.5d temperate recovery)
+    let out = run_drill_sim(
+        "badtide_unbuilt_floodgate_2d",
+        cfg,
+        30,
+        0.25,
+        logger,
+        |srv| {
+            // Ensure notifications advertise BadtideApproaching right at drill start
+            let mut w = srv.state.world.lock().unwrap();
+            w.notifications
+                .push(timberbot_protocol::http::NotificationItem {
+                    subject: "BadtideApproaching".to_string(),
+                    description: "Badtide begins in 2 days".to_string(),
+                    cycle: 2,
+                    cycle_day: 11,
+                    entity_id: None,
+                });
+            // Put Lodge at High priority so the agent MUST reprioritize Floodgate to VeryHigh!
+            for b in &mut w.buildings {
+                if b.name.starts_with("Lodge.") && b.finished == 0 {
+                    b.construction_priority = Some(Priority::High);
+                }
+            }
+        },
+    )
+    .await?;
+
+    let picked_divert = out
+        .tactics_used
+        .get(TacticId::DivertBadtideFloodgates.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let fg_finished = out.final_state.floodgates.iter().any(|f| f.finished);
+    let checks = vec![
+        check(
+            "picked_divert_badtide_floodgates",
+            picked_divert,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "floodgate_finished_in_time",
+            fg_finished,
+            format!("floodgates={:?}", out.final_state.floodgates),
+        ),
+        check(
+            "intake_clean_during_badtide",
+            out.max_intake_contam < 0.15,
+            format!("max_intake_contam={:.2}", out.max_intake_contam),
+        ),
+        check(
+            "zero_deaths_and_zero_contamination",
+            out.deaths == 0 && out.contamination_events == 0,
+            format!(
+                "deaths={}, contam_events={}",
+                out.deaths, out.contamination_events
+            ),
+        ),
+        check(
+            "zero_playbook_failures",
+            out.playbook_failures == 0,
+            format!("failures={}", out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "badtide_unbuilt_floodgate_2d".to_string(),
+        description: "2 days before badtide with unbuilt floodgate behind a High-priority Lodge"
+            .to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 2: Low logs, few remaining trees, 0 planks, and no Forester.
+/// Tests strict precedence: PowerWheel -> LumberMill -> Planks >= 7 -> Unlock & place Forester -> saplings planted!
+pub async fn drill_low_logs_no_forester(logger: Option<&mut TraceLogger>) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("Folktails", Difficulty::Normal);
+    cfg.name = "DrillLowLogsNoForester".to_string();
+    cfg.temperate_weather_duration = 25;
+    cfg.cycle_day = 2;
+    cfg.science = 50; // Enough to unlock Forester (30 SP) once planks exist
+    cfg.initial_trees = 6; // Very few mature trees left!
+    cfg.resources.insert("Water".to_string(), 220);
+    cfg.resources.insert("Carrot".to_string(), 240);
+    cfg.resources.insert("Log".to_string(), 42);
+    cfg.resources.insert("Plank".to_string(), 0);
+    // Keep Dam so agent focuses straight on timber/plank/forester chain
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Dam.Folktails".to_string(),
+        x: 10,
+        y: 18,
+        z: 1,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.retain(|b| {
+        !b.name.contains("Forester")
+            && !b.name.contains("LumberMill")
+            && !b.name.contains("PowerWheel")
+            && !b.name.contains("WaterWheel")
+    });
+
+    // Run 24 steps * 0.5d = 12 days so PowerWheel -> LumberMill -> Planks -> Forester -> Saplings all execute!
+    let out = run_drill_sim("low_logs_no_forester", cfg, 24, 0.5, logger, |_| {}).await?;
+
+    let staged_planks = out
+        .tactics_used
+        .get(TacticId::StagePlankChain.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let unlocked_forester = out
+        .tactics_used
+        .get(TacticId::UnlockAndPlantForester.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let checks = vec![
+        check(
+            "staged_plank_and_power_chain_first",
+            staged_planks && out.final_state.power_generators_finished > 0,
+            format!(
+                "power_gens={}, lumber_mills={}, tactics={:?}",
+                out.final_state.power_generators_finished,
+                out.final_state.lumber_mills_finished,
+                out.tactics_used
+            ),
+        ),
+        check(
+            "unlocked_and_built_forester",
+            unlocked_forester && out.final_state.foresters_finished > 0,
+            format!(
+                "foresters_finished={}, unlocked={}",
+                out.final_state.foresters_finished, out.final_state.forester_unlocked
+            ),
+        ),
+        check(
+            "forester_planted_new_saplings",
+            out.final_state.sapling_trees > 0,
+            format!(
+                "saplings={}, grown_trees={}",
+                out.final_state.sapling_trees, out.final_state.grown_trees
+            ),
+        ),
+        check(
+            "zero_deaths_and_zero_playbook_failures",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!("deaths={}, failures={}", out.deaths, out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "low_logs_no_forester".to_string(),
+        description: "Low logs, 6 remaining trees, 0 planks, no Forester — stages power -> planks -> Forester -> saplings".to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 3: Mid-drought food crunch with dry river, paused Farmhouse, and < 24h food runway.
+pub async fn drill_mid_drought_food_crunch(
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("Folktails", Difficulty::Normal);
+    cfg.name = "DrillMidDroughtFoodCrunch".to_string();
+    cfg.auto_cycle_hazards = false;
+    cfg.is_hazardous = true;
+    cfg.hazard_kind = HazardKind::Drought;
+    cfg.cycle = 2;
+    cfg.cycle_day = 15;
+    cfg.temperate_weather_duration = 14;
+    cfg.hazardous_weather_duration = 5;
+    cfg.reservoir_water_depth = 0.0; // Dry river -> no new crop growth during drought!
+    cfg.resources.insert("Water".to_string(), 220);
+    cfg.resources.insert("Carrot".to_string(), 20);
+    cfg.resources.insert("Berries".to_string(), 5);
+    cfg.initial_crops = 30;
+    cfg.initial_gatherables = 24;
+    for b in &mut cfg.buildings {
+        if b.name.contains("FarmHouse") || b.name.contains("Farmhouse") {
+            b.paused = true;
+        }
+    }
+
+    // 16 steps * 0.25d = 4.0 drought days
+    let out = run_drill_sim("mid_drought_food_crunch", cfg, 16, 0.25, logger, |srv| {
+        // Make existing crops already grown and ready to harvest once Farmhouse is unpaused!
+        let mut w = srv.state.world.lock().unwrap();
+        for c in &mut w.crops {
+            c.growth = Some(1.0);
+            c.grown = Some(1);
+        }
+    })
+    .await?;
+
+    let picked_food = out
+        .tactics_used
+        .get(TacticId::EmergencyFoodRationing.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let checks = vec![
+        check(
+            "picked_emergency_food_rationing",
+            picked_food,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "unpaused_farmhouse_and_harvested",
+            out.final_state.farms_active > 0 && out.final_state.food_stock > 25,
+            format!(
+                "farms_active={}, food_stock={}",
+                out.final_state.farms_active, out.final_state.food_stock
+            ),
+        ),
+        check(
+            "survived_drought_zero_deaths",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!(
+                "deaths={}, min_food={}, failures={}",
+                out.deaths, out.min_food_stock, out.playbook_failures
+            ),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "mid_drought_food_crunch".to_string(),
+        description: "Mid-drought dry river with < 24h food runway and paused Farmhouse"
+            .to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 4: Iron Teeth power-before-LumberMill precedence drill.
+pub async fn drill_power_before_lumber_mill_it(
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("IronTeeth", Difficulty::Normal);
+    cfg.name = "DrillPowerBeforeMillIT".to_string();
+    cfg.temperate_weather_duration = 20;
+    cfg.resources.insert("Water".to_string(), 240);
+    cfg.resources.insert("Kohlrabi".to_string(), 240);
+    cfg.resources.insert("Berries".to_string(), 60);
+    cfg.resources.insert("Log".to_string(), 55);
+    cfg.resources.insert("Plank".to_string(), 0);
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Dam.IronTeeth".to_string(),
+        x: 10,
+        y: 18,
+        z: 1,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "LumberMill.IronTeeth".to_string(),
+        x: 19,
+        y: 16,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+
+    let out = run_drill_sim("power_before_lumber_mill_it", cfg, 16, 0.5, logger, |_| {}).await?;
+
+    let checks = vec![
+        check(
+            "picked_stage_plank_chain",
+            out.tactics_used
+                .get(TacticId::StagePlankChain.as_str())
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "built_large_power_wheel_and_powered_mill",
+            out.final_state.power_generators_finished > 0
+                && out.final_state.lumber_mills_unpowered == 0,
+            format!(
+                "gens={}, unpowered_mills={}, power={}/{}",
+                out.final_state.power_generators_finished,
+                out.final_state.lumber_mills_unpowered,
+                out.final_state.power_supply,
+                out.final_state.power_demand
+            ),
+        ),
+        check(
+            "produced_planks_from_logs",
+            out.final_state.planks >= 10,
+            format!("planks={}", out.final_state.planks),
+        ),
+        check(
+            "zero_deaths_and_failures",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!("deaths={}, failures={}", out.deaths, out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "power_before_lumber_mill_it".to_string(),
+        description: "Iron Teeth unpowered LumberMill with 0 planks — stages LargePowerWheel first"
+            .to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 5 & 6: Multi-cycle survival using the pure 4-layer loop (Folktails & Iron Teeth).
+pub async fn drill_multi_cycle_survival(
+    faction: &str,
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let name = format!("multi_cycle_survival_{}", faction.to_ascii_lowercase());
+    let mut cfg = ScenarioConfig::preset(faction, Difficulty::Normal);
+    cfg.name = format!("DrillMultiCycle{faction}");
+    // 60 steps * 0.5d = 30 in-game days (>= 1 full temperate + drought cycle!)
+    let out = run_drill_sim(&name, cfg, 60, 0.5, logger, |_| {}).await?;
+
+    let checks = vec![
+        check(
+            "completed_at_least_one_full_cycle",
+            out.cycles_completed >= 1,
+            format!(
+                "cycles_completed={}, day={}",
+                out.cycles_completed, out.final_state.day
+            ),
+        ),
+        check(
+            "zero_deaths",
+            out.deaths == 0,
+            format!(
+                "deaths={}, pop={}, min_water={}, min_food={}",
+                out.deaths, out.final_state.population, out.min_water_stock, out.min_food_stock
+            ),
+        ),
+        check(
+            "zero_playbook_failures",
+            out.playbook_failures == 0,
+            format!("failures={}", out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name,
+        description: format!("{faction} Normal 30-day multi-cycle survival under the 4-layer loop"),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 7: Mid-game Folktails GearWorkshop + power expansion chain (`stage_gears_chain_ft`).
+pub async fn drill_stage_gears_chain_ft(logger: Option<&mut TraceLogger>) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("Folktails", Difficulty::Normal);
+    cfg.name = "DrillStageGearsFT".to_string();
+    cfg.temperate_weather_duration = 25;
+    cfg.science = 200;
+    cfg.resources.insert("Water".to_string(), 260);
+    cfg.resources.insert("Carrot".to_string(), 240);
+    cfg.resources.insert("Berries".to_string(), 60);
+    cfg.resources.insert("Log".to_string(), 80);
+    cfg.resources.insert("Plank".to_string(), 40);
+    cfg.resources.insert("Gear".to_string(), 0);
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Dam.Folktails".to_string(),
+        x: 10,
+        y: 18,
+        z: 1,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Forester.Folktails".to_string(),
+        x: 21,
+        y: 15,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Inventor.Folktails".to_string(),
+        x: 15,
+        y: 15,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "WaterWheel.Folktails".to_string(),
+        x: 10,
+        y: 16,
+        z: 1,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "PowerShaft.Folktails".to_string(),
+        x: 13,
+        y: 16,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "PowerShaft.Folktails".to_string(),
+        x: 16,
+        y: 16,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "LumberMill.Folktails".to_string(),
+        x: 17,
+        y: 16,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+
+    // 20 steps * 0.5d = 10 days -> unlocks GearWorkshop, builds it connected to power, crafts Gears
+    let out = run_drill_sim("stage_gears_chain_ft", cfg, 20, 0.5, logger, |_| {}).await?;
+
+    let picked_gears = out
+        .tactics_used
+        .get(TacticId::StageGearChain.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let checks = vec![
+        check(
+            "picked_stage_gear_chain",
+            picked_gears,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "unlocked_and_built_gear_workshop",
+            out.final_state.gear_workshop_unlocked && out.final_state.gear_workshops_finished > 0,
+            format!(
+                "unlocked={}, finished={}",
+                out.final_state.gear_workshop_unlocked, out.final_state.gear_workshops_finished
+            ),
+        ),
+        check(
+            "produced_gears_on_connected_power_network",
+            out.final_state.gears >= 5 && out.final_state.disconnected_power_consumers == 0,
+            format!(
+                "gears={}, disconn_power={}",
+                out.final_state.gears, out.final_state.disconnected_power_consumers
+            ),
+        ),
+        check(
+            "zero_deaths_and_failures",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!("deaths={}, failures={}", out.deaths, out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "stage_gears_chain_ft".to_string(),
+        description: "Folktails mid-game colony stages connected GearWorkshop and produces Gears"
+            .to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 8: Iron Teeth BreedingPod throttling under tight beds & berries.
+pub async fn drill_iron_teeth_breeding_pod_control(
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("IronTeeth", Difficulty::Normal);
+    cfg.name = "DrillIronTeethPods".to_string();
+    cfg.temperate_weather_duration = 20;
+    cfg.adults = 10;
+    cfg.children = 3;
+    cfg.resources.insert("Water".to_string(), 240);
+    cfg.resources.insert("Kohlrabi".to_string(), 220);
+    cfg.resources.insert("Berries".to_string(), 10); // low berries -> must pause pods!
+    cfg.resources.insert("Log".to_string(), 45);
+    cfg.resources.insert("Plank".to_string(), 20);
+    cfg.resources.insert("Gear".to_string(), 10);
+    cfg.science = 200;
+    // Remove extra gatherables so berries stay tight if pods aren't paused
+    cfg.initial_gatherables = 2;
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Dam.IronTeeth".to_string(),
+        x: 10,
+        y: 18,
+        z: 1,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Forester.IronTeeth".to_string(),
+        x: 21,
+        y: 15,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Inventor.IronTeeth".to_string(),
+        x: 15,
+        y: 15,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    // Add a second active BreedingPod so pods clearly need throttling when free_beds <= 0
+    cfg.buildings.push(ScenarioBuilding {
+        name: "BreedingPod.IronTeeth".to_string(),
+        x: 17,
+        y: 18,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+
+    let out = run_drill_sim(
+        "iron_teeth_breeding_pod_control",
+        cfg,
+        12,
+        0.5,
+        logger,
+        |_| {},
+    )
+    .await?;
+
+    let picked_pods = out
+        .tactics_used
+        .get(TacticId::ManageBreedingPods.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let checks = vec![
+        check(
+            "picked_manage_breeding_pods",
+            picked_pods,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "paused_pods_during_crunch_and_stabilized_before_resuming",
+            out.max_paused_pods > 0
+                && (out.final_state.breeding_pods_paused > 0
+                    || (out.final_state.free_beds >= 2 && out.final_state.berries >= 15)),
+            format!(
+                "max_paused_pods={}, final_active={}, final_paused={}, free_beds={}, berries={}",
+                out.max_paused_pods,
+                out.final_state.breeding_pods_active,
+                out.final_state.breeding_pods_paused,
+                out.final_state.free_beds,
+                out.final_state.berries
+            ),
+        ),
+        check(
+            "zero_deaths_and_failures",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!("deaths={}, failures={}", out.deaths, out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "iron_teeth_breeding_pod_control".to_string(),
+        description: "Iron Teeth colony throttles BreedingPods under low berries & bed cap"
+            .to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 9: Post-deforestation Forester recovery (`forester_post_deforestation_recovery`).
+pub async fn drill_forester_post_deforestation_recovery(
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("Folktails", Difficulty::Normal);
+    cfg.name = "DrillForesterRecovery".to_string();
+    cfg.temperate_weather_duration = 25;
+    cfg.initial_trees = 2; // near-total deforestation!
+    cfg.science = 60;
+    cfg.resources.insert("Water".to_string(), 240);
+    cfg.resources.insert("Carrot".to_string(), 220);
+    cfg.resources.insert("Log".to_string(), 24);
+    cfg.resources.insert("Plank".to_string(), 14);
+    cfg.buildings.push(ScenarioBuilding {
+        name: "Dam.Folktails".to_string(),
+        x: 10,
+        y: 18,
+        z: 1,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+
+    let out = run_drill_sim(
+        "forester_post_deforestation_recovery",
+        cfg,
+        16,
+        0.5,
+        logger,
+        |_| {},
+    )
+    .await?;
+
+    let picked_forester = out
+        .tactics_used
+        .get(TacticId::UnlockAndPlantForester.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let checks = vec![
+        check(
+            "picked_unlock_and_plant_forester",
+            picked_forester,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "replanted_saplings_after_deforestation",
+            out.final_state.foresters_finished > 0 && out.final_state.sapling_trees >= 5,
+            format!(
+                "foresters={}, saplings={}, grown={}",
+                out.final_state.foresters_finished,
+                out.final_state.sapling_trees,
+                out.final_state.grown_trees
+            ),
+        ),
+        check(
+            "zero_deaths_and_failures",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!("deaths={}, failures={}", out.deaths, out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "forester_post_deforestation_recovery".to_string(),
+        description:
+            "Post-deforestation Folktails colony unlocks Forester and replants Pine groves"
+                .to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Drill 10: Multi-crisis topology recovery (unreachable remote site + disconnected power network).
+pub async fn drill_multi_crisis_topology_recovery(
+    logger: Option<&mut TraceLogger>,
+) -> Result<DrillResult> {
+    let mut cfg = ScenarioConfig::preset("Folktails", Difficulty::Normal);
+    cfg.name = "DrillMultiCrisisTopology".to_string();
+    cfg.temperate_weather_duration = 20;
+    cfg.resources.insert("Water".to_string(), 200);
+    cfg.resources.insert("Carrot".to_string(), 180);
+    cfg.resources.insert("Log".to_string(), 70);
+    cfg.resources.insert("Plank".to_string(), 0);
+    // Remote unfinished tank at (28, 28) -> unreachable=0 until linked by Paths!
+    cfg.buildings.push(ScenarioBuilding {
+        name: "SmallTank.Folktails".to_string(),
+        x: 28,
+        y: 28,
+        z: 2,
+        orientation: Orientation::South,
+        finished: false,
+        paused: false,
+        workers: None,
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    // PowerWheel at (12, 16) + disconnected LumberMill at (20, 16) -> 2 separate power networks!
+    cfg.buildings.push(ScenarioBuilding {
+        name: "PowerWheel.Folktails".to_string(),
+        x: 12,
+        y: 16,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+    cfg.buildings.push(ScenarioBuilding {
+        name: "LumberMill.Folktails".to_string(),
+        x: 20,
+        y: 16,
+        z: 2,
+        orientation: Orientation::South,
+        finished: true,
+        paused: false,
+        workers: Some(1),
+        floodgate_height: None,
+        max_height: None,
+        recipe: None,
+        allowed_good: None,
+        storage_mode: None,
+    });
+
+    let out = run_drill_sim(
+        "multi_crisis_topology_recovery",
+        cfg,
+        16,
+        0.5,
+        logger,
+        |_| {},
+    )
+    .await?;
+
+    let picked_crisis = out
+        .tactics_used
+        .get(TacticId::RecoverColonyCrisis.as_str())
+        .copied()
+        .unwrap_or(0)
+        > 0;
+    let checks = vec![
+        check(
+            "picked_recover_colony_crisis",
+            picked_crisis,
+            format!("tactics={:?}", out.tactics_used),
+        ),
+        check(
+            "reconnected_unreachable_sites_and_power_network",
+            out.final_state.unreachable_buildings == 0
+                && out.final_state.disconnected_power_consumers == 0,
+            format!(
+                "unreachable={}, disconn_power={}, power_nets={}",
+                out.final_state.unreachable_buildings,
+                out.final_state.disconnected_power_consumers,
+                out.final_state.power_network_count
+            ),
+        ),
+        check(
+            "bridged_lumber_mill_produced_planks",
+            out.final_state.planks >= 5,
+            format!("planks={}", out.final_state.planks),
+        ),
+        check(
+            "zero_deaths_and_failures",
+            out.deaths == 0 && out.playbook_failures == 0,
+            format!("deaths={}, failures={}", out.deaths, out.playbook_failures),
+        ),
+    ];
+    let passed = checks.iter().all(|c| c.passed);
+    Ok(DrillResult {
+        name: "multi_crisis_topology_recovery".to_string(),
+        description: "Multi-crisis colony reconnects isolated site via Paths and bridges disconnected LumberMill via PowerShafts".to_string(),
+        passed,
+        steps_run: out.steps_run,
+        final_day: out.final_state.day,
+        deaths: out.deaths,
+        contamination_events: out.contamination_events,
+        playbook_failures: out.playbook_failures,
+        tactics_used: out.tactics_used,
+        checks,
+    })
+}
+
+/// Run all 10 staged drills using the deterministic baseline policy.
+pub async fn run_all_drills(
+    filter: Option<&str>,
+    trace_out: Option<&Path>,
+) -> Result<DrillSuiteReport> {
+    run_all_drills_with_backend(filter, trace_out, &PolicyBackend::DeterministicBaseline).await
+}
+
+/// Run all 10 staged drills (or a substring-filtered subset) using the supplied
+/// [`PolicyBackend`] (`DeterministicBaseline` or `ModelBacked`), optionally writing every
+/// Layer 3 decision trace to `trace_out`.
+pub async fn run_all_drills_with_backend(
+    filter: Option<&str>,
+    trace_out: Option<&Path>,
+    backend: &PolicyBackend,
+) -> Result<DrillSuiteReport> {
+    ACTIVE_BACKEND
+        .scope(backend.clone(), async move {
+            run_all_drills_inner(filter, trace_out).await
+        })
+        .await
+}
+
+async fn run_all_drills_inner(
+    filter: Option<&str>,
+    trace_out: Option<&Path>,
+) -> Result<DrillSuiteReport> {
+    let mut logger = match trace_out {
+        Some(p) => {
+            let _ = std::fs::remove_file(p);
+            Some(TraceLogger::open(p)?)
+        }
+        None => None,
+    };
+
+    let want = |name: &str| filter.is_none_or(|f| name.contains(f));
+    let mut drills = Vec::new();
+
+    if want("badtide_unbuilt_floodgate_2d") {
+        drills.push(drill_badtide_unbuilt_floodgate_2d(logger.as_mut()).await?);
+    }
+    if want("low_logs_no_forester") {
+        drills.push(drill_low_logs_no_forester(logger.as_mut()).await?);
+    }
+    if want("mid_drought_food_crunch") {
+        drills.push(drill_mid_drought_food_crunch(logger.as_mut()).await?);
+    }
+    if want("power_before_lumber_mill_it") {
+        drills.push(drill_power_before_lumber_mill_it(logger.as_mut()).await?);
+    }
+    if want("multi_cycle_survival_folktails") {
+        drills.push(drill_multi_cycle_survival("Folktails", logger.as_mut()).await?);
+    }
+    if want("multi_cycle_survival_ironteeth") {
+        drills.push(drill_multi_cycle_survival("IronTeeth", logger.as_mut()).await?);
+    }
+    if want("stage_gears_chain_ft") {
+        drills.push(drill_stage_gears_chain_ft(logger.as_mut()).await?);
+    }
+    if want("iron_teeth_breeding_pod_control") {
+        drills.push(drill_iron_teeth_breeding_pod_control(logger.as_mut()).await?);
+    }
+    if want("forester_post_deforestation_recovery") {
+        drills.push(drill_forester_post_deforestation_recovery(logger.as_mut()).await?);
+    }
+    if want("multi_crisis_topology_recovery") {
+        drills.push(drill_multi_crisis_topology_recovery(logger.as_mut()).await?);
+    }
+
+    let total = drills.len();
+    let passed = drills.iter().filter(|d| d.passed).count();
+    let failed = total.saturating_sub(passed);
+    let pass_rate_pct = if total == 0 {
+        100.0
+    } else {
+        ((passed as f64) / (total as f64) * 1000.0).round() / 10.0
+    };
+
+    Ok(DrillSuiteReport {
+        total,
+        passed,
+        failed,
+        pass_rate_pct,
+        drills,
+    })
+}
+
+/// Combined outer-loop promotion gate requiring BOTH Layer 3 offline evals (with zero
+/// regressions against an optional baseline report) AND Layer 4 staged drills to pass.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PromotionGateReport {
+    pub promoted: bool,
+    pub block_reasons: Vec<String>,
+    pub offline: OfflineEvalReport,
+    pub regression: Option<RegressionComparison>,
+    pub drills: DrillSuiteReport,
+}
+
+pub async fn run_promotion_gate(
+    cases_path: &Path,
+    baseline_report_path: Option<&Path>,
+    drill_filter: Option<&str>,
+    trace_out: Option<&Path>,
+    backend: &PolicyBackend,
+) -> Result<PromotionGateReport> {
+    let cases = load_cases(cases_path)?;
+    let offline = evaluate_cases_with_backend(&cases, backend).await;
+
+    let regression = match baseline_report_path {
+        Some(p) => {
+            let raw = std::fs::read_to_string(p)?;
+            let baseline: OfflineEvalReport = serde_json::from_str(&raw)?;
+            Some(compare_against_baseline(&baseline, &offline))
+        }
+        None => None,
+    };
+
+    let drills = run_all_drills_with_backend(drill_filter, trace_out, backend).await?;
+
+    let mut block_reasons = Vec::new();
+    if offline.failed > 0 {
+        block_reasons.push(format!(
+            "offline eval gate failed: {}/{} passed ({:.1}%)",
+            offline.passed, offline.total, offline.accuracy_pct
+        ));
+    }
+    if let Some(ref reg) = regression {
+        if reg.regressed {
+            block_reasons.push(format!(
+                "regression gate failed: newly_failing={:?}, accuracy_delta={:+.1}%",
+                reg.newly_failing, reg.accuracy_delta_pct
+            ));
+        }
+    }
+    if drills.failed > 0 {
+        let failed_names: Vec<&str> = drills
+            .drills
+            .iter()
+            .filter(|d| !d.passed)
+            .map(|d| d.name.as_str())
+            .collect();
+        block_reasons.push(format!(
+            "staged drills gate failed: {}/{} passed (failed: {:?})",
+            drills.passed, drills.total, failed_names
+        ));
+    }
+    if drills
+        .drills
+        .iter()
+        .any(|d| d.deaths > 0 || d.playbook_failures > 0)
+    {
+        block_reasons.push("staged drills recorded beaver deaths or playbook failures".to_string());
+    }
+
+    Ok(PromotionGateReport {
+        promoted: block_reasons.is_empty(),
+        block_reasons,
+        offline,
+        regression,
+        drills,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn all_staged_drills_pass_and_emit_valid_traces() {
+        let trace_path = std::env::temp_dir().join(format!(
+            "timberbot-drills-traces-{}.jsonl",
+            std::process::id()
+        ));
+        let report = run_all_drills(None, Some(&trace_path))
+            .await
+            .expect("run staged drills");
+        for d in &report.drills {
+            assert!(d.passed, "drill '{}' failed: {:?}", d.name, d.checks);
+        }
+        assert_eq!(report.total, 10);
+        assert_eq!(report.passed, 10);
+
+        let traces = timberbot_eval::read_traces(&trace_path).expect("read emitted traces");
+        assert!(
+            traces.len() >= 250,
+            "expected >= 250 trace rows across 10 drills"
+        );
+        let replay = timberbot_eval::replay_traces(&traces);
+        assert_eq!(replay.decision_drift_count, 0);
+        assert_eq!(replay.state_bug_count, 0);
+        assert_eq!(replay.playbook_failure_count, 0);
+
+        let _ = std::fs::remove_file(&trace_path);
+    }
+}

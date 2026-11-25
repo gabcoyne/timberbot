@@ -1,0 +1,24 @@
+[package]
+name = "timberbot-drills"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Layer 4 staged drills harness and outer-loop CLI (offline eval, drills, trace replay)"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+timberbot-client.workspace = true
+timberbot-eval.workspace = true
+timberbot-mock.workspace = true
+timberbot-protocol.workspace = true
+timberbot-state.workspace = true
+timberbot-tactics.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+axum.workspace = true

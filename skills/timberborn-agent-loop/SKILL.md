@@ -5,9 +5,10 @@ description: "Use when a bot is actively driving a live Timberborn game and need
 
 # The Timberborn agent loop
 
-An LLM is too slow and too expensive to make every tick-level decision. Split the work in two:
-- **Deterministic managers**: small loops (for example, the reference Rust `rust/crates/timberbot-agent` binary or Python scripts) that hold invariants, such as "keep pumps staffed" or "close the floodgate when a badtide starts".
-- **The LLM planner**: runs at decision points. It sets goals, picks sites, chooses unlocks, and handles anything new or unexpected.
+An LLM is too slow and too expensive to make every tick-level decision. Split the work into the 4-layer architecture (`docs/four-layer-outer-loop.md`):
+- **Layer 1 & 2 deterministic runtime (`timberbot-state` + `timberbot-tactics`)**: compile a deterministic typed state (runways, ETAs, blocked prerequisites, upstream river lag), pick one named faction tactic from the catalogue with lead-time checks, and execute sequential writes via deterministic playbooks.
+- **Layer 3 & 4 outer loop (`timberbot-eval` + `timberbot-drills`)**: log JSONL traces, run offline evals (`scenarios/eval-cases.json`) to classify `StateBug` / `MissingCatalogueTactic` / `PickError` / `PlaybookBug`, verify in staged drills, and promote fixes.
+- **The LLM planner**: runs at strategic decision points or in the outer loop to add tactics, labeled cases, and site plans.
 
 ## The cycle (one "turn")
 ```
