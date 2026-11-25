@@ -535,6 +535,10 @@ pub struct MockWorld {
 
     pub reservoir_water_depth: f64,
     pub river_contamination: f64,
+    /// 1D segmented river depth along y = 0..map_size.y (upstream y=0 -> downstream).
+    pub river_depth: Vec<f64>,
+    /// 1D segmented river badwater contamination (0.0..=1.0) along y = 0..map_size.y.
+    pub river_contam: Vec<f64>,
 
     pub science: u32,
     pub science_accum: f64,
@@ -714,6 +718,8 @@ impl MockWorld {
             approaching_emitted_for_cycle: 0,
             reservoir_water_depth: cfg.reservoir_water_depth,
             river_contamination: cfg.river_contamination,
+            river_depth: vec![cfg.reservoir_water_depth; 32],
+            river_contam: vec![cfg.river_contamination; 32],
             science: cfg.science,
             science_accum: 0.0,
             resources,
@@ -964,56 +970,103 @@ impl MockWorld {
             }
         }
 
-        // Update river water depth & contamination using verified Dam/Floodgate & Evaporation rates
+        // Update 1D river channel (y = 0..map_size.y) with tile-by-tile propagation lag,
+        // floodgate badwater blocking at fg.y, and verified Dam/Floodgate evaporation rates.
+        let river_len = self.river_depth.len().max(1);
+        let intake_y = 14usize.min(river_len - 1);
         let max_gate_height = self
             .buildings
             .iter()
             .filter(|b| b.finished == 1 && b.floodgate == Some(1))
             .filter_map(|b| b.height)
             .fold(0.0_f64, f64::max);
+        let blocking_gate_y = self
+            .buildings
+            .iter()
+            .filter(|b| b.finished == 1 && b.floodgate == Some(1) && b.height.unwrap_or(0.0) >= 0.8)
+            .map(|b| b.y.clamp(0, (river_len - 1) as i32) as usize)
+            .min();
         let has_dam = self
             .buildings
             .iter()
             .any(|b| b.finished == 1 && b.name.starts_with("Dam."));
 
-        if self.is_hazardous {
-            match self.hazard_kind {
-                HazardKind::Drought => {
-                    self.river_contamination = 0.0;
-                    let evap = if max_gate_height >= DAM_SPILL_HEIGHT || has_dam {
-                        EVAP_WIDE_POOL_PER_DAY
-                    } else if max_gate_height > 0.0 {
-                        EVAP_MEDIUM_CHANNEL_PER_DAY
-                    } else {
-                        EVAP_NARROW_CHANNEL_PER_DAY
-                    };
-                    self.reservoir_water_depth = (self.reservoir_water_depth - evap * dt).max(0.0);
-                }
-                HazardKind::Badtide => {
-                    // Verified direction: raising a floodgate blocks incoming badwater flow
-                    // (diverting it upstream); height 0 is wide open and floods the reservoir.
-                    let diverted = max_gate_height >= 0.8;
-                    if diverted {
-                        self.river_contamination = (self.river_contamination - 0.5 * dt).max(0.0);
-                        self.reservoir_water_depth =
-                            (self.reservoir_water_depth - EVAP_WIDE_POOL_PER_DAY * dt).max(0.0);
-                    } else {
-                        self.river_contamination = 0.95;
-                        self.reservoir_water_depth = 1.5;
+        // Advect river waves in 1-tile steps (`1 / WATER_PROPAGATION_TILES_PER_DAY` days per tile)
+        // so upstream tiles feel drought/badtide/recovery earlier than downstream tiles.
+        let step_dt = 1.0 / WATER_PROPAGATION_TILES_PER_DAY;
+        let mut remaining_dt = dt;
+        while remaining_dt > 1e-9 {
+            let sub_dt = remaining_dt.min(step_dt);
+            let frac = (sub_dt / step_dt).clamp(0.0, 1.0);
+            remaining_dt -= sub_dt;
+
+            if self.is_hazardous {
+                match self.hazard_kind {
+                    HazardKind::Drought => {
+                        let evap = if max_gate_height >= DAM_SPILL_HEIGHT || has_dam {
+                            EVAP_WIDE_POOL_PER_DAY
+                        } else if max_gate_height > 0.0 {
+                            EVAP_MEDIUM_CHANNEL_PER_DAY
+                        } else {
+                            EVAP_NARROW_CHANNEL_PER_DAY
+                        };
+                        for y in 0..river_len {
+                            self.river_contam[y] = (self.river_contam[y] - 0.5 * sub_dt).max(0.0);
+                            self.river_depth[y] = (self.river_depth[y] - evap * sub_dt).max(0.0);
+                        }
+                    }
+                    HazardKind::Badtide => {
+                        let prev_c = self.river_contam.clone();
+                        let prev_d = self.river_depth.clone();
+                        // Upstream source y=0 emits badwater immediately
+                        self.river_contam[0] = prev_c[0] + (0.95 - prev_c[0]) * frac;
+                        self.river_depth[0] = prev_d[0] + (1.5 - prev_d[0]) * frac;
+                        for y in 1..river_len {
+                            if blocking_gate_y.is_some_and(|gy| y >= gy) {
+                                // Raised floodgate diverts incoming badwater upstream of gy
+                                self.river_contam[y] = (prev_c[y] - 0.5 * sub_dt).max(0.0);
+                                self.river_depth[y] =
+                                    (prev_d[y] - EVAP_WIDE_POOL_PER_DAY * sub_dt).max(0.0);
+                            } else {
+                                self.river_contam[y] =
+                                    prev_c[y] + (prev_c[y - 1] - prev_c[y]) * frac;
+                                self.river_depth[y] =
+                                    prev_d[y] + (prev_d[y - 1] - prev_d[y]) * frac;
+                            }
+                        }
                     }
                 }
-            }
-        } else {
-            self.river_contamination = (self.river_contamination - 0.5 * dt).max(0.0);
-            let target_depth = if max_gate_height >= 0.8 {
-                (max_gate_height + 0.2).min(2.2)
-            } else if has_dam {
-                1.6
             } else {
-                1.4
-            };
-            self.reservoir_water_depth = (self.reservoir_water_depth + 0.6 * dt).min(target_depth);
+                let target_depth = if max_gate_height >= 0.8 {
+                    (max_gate_height + 0.2).min(2.2)
+                } else if has_dam {
+                    1.6
+                } else {
+                    1.4
+                };
+                let prev_c = self.river_contam.clone();
+                let prev_d = self.river_depth.clone();
+                // Temperate river source immediately emits clean fresh water (0.0 contam),
+                // flushing badwater downstream tile-by-tile at WATER_PROPAGATION_TILES_PER_DAY.
+                self.river_contam[0] = (prev_c[0] * (1.0 - frac)).max(0.0);
+                self.river_depth[0] = (prev_d[0] + 0.6 * sub_dt).min(target_depth);
+                for y in 1..river_len {
+                    let blocked = blocking_gate_y.is_some_and(|gy| y >= gy);
+                    if blocked && prev_c[y - 1] > prev_c[y] {
+                        // Raised floodgate still holds back lingering upstream badwater
+                        self.river_contam[y] = (prev_c[y] - 0.5 * sub_dt).max(0.0);
+                    } else {
+                        self.river_contam[y] = (prev_c[y] + (prev_c[y - 1] - prev_c[y]) * frac
+                            - 0.5 * sub_dt)
+                            .max(0.0);
+                    }
+                    self.river_depth[y] = (prev_d[y] + (prev_d[y - 1] - prev_d[y]) * frac)
+                        .max((prev_d[y] + 0.6 * sub_dt).min(target_depth));
+                }
+            }
         }
+        self.reservoir_water_depth = self.river_depth[intake_y];
+        self.river_contamination = self.river_contam[intake_y];
 
         // Track badwater contamination exposure (`CONTAMINATION_ONSET_DAYS = 3.0d`)
         let exposed_to_badwater = self.river_contamination >= IRRIGATION_POLLUTION_CUTOFF;
@@ -1032,18 +1085,107 @@ impl MockWorld {
         self.rebalance_workers_and_housing();
         self.update_power_grid();
 
-        // Advance construction sites
+        // District Center origin for walking/hauling distance calculations
+        let (dc_x, dc_y) = self
+            .buildings
+            .iter()
+            .find(|b| b.name.starts_with("DistrictCenter"))
+            .map(|b| (b.x, b.y))
+            .unwrap_or((16, 16));
+
+        // Work hours elapsed during this step (hours/day * dt)
+        let work_hours_dt = (self.work_end_hours as f64) * dt;
+
+        // Builder-queued construction with hauling (`material_progress`) + work-hours (`build_progress`).
+        // Buildings do NOT appear instantly unless `build_work_hours == 0.0` (Path/Flags).
+        // Only active builders on finished, unpaused District Centers and Builder's Huts advance sites.
+        let active_builders: f64 = self
+            .buildings
+            .iter()
+            .filter(|b| {
+                b.finished == 1
+                    && b.paused == 0
+                    && (b.name.starts_with("DistrictCenter") || b.name.starts_with("BuildersHut"))
+            })
+            .map(|b| b.assigned_workers.unwrap_or(0) as f64)
+            .sum();
+        let mut builder_hours = active_builders * work_hours_dt;
+
+        let mut site_indices: Vec<usize> = self
+            .buildings
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| b.finished == 0 && b.paused == 0)
+            .map(|(i, _)| i)
+            .collect();
+        site_indices.sort_by(|&a, &b| {
+            let pa = priority_rank(
+                self.buildings[a]
+                    .construction_priority
+                    .unwrap_or(Priority::Normal),
+            );
+            let pb = priority_rank(
+                self.buildings[b]
+                    .construction_priority
+                    .unwrap_or(Priority::Normal),
+            );
+            pb.cmp(&pa)
+                .then_with(|| self.buildings[a].id.cmp(&self.buildings[b].id))
+        });
+
         let mut newly_finished = Vec::new();
-        for b in &mut self.buildings {
-            if b.finished == 0 && b.paused == 0 {
-                let prev = b.build_progress.unwrap_or(0.0);
-                let next = (prev + 1.2 * dt).min(1.0);
-                b.build_progress = Some(next);
+        for idx in site_indices {
+            let b = &mut self.buildings[idx];
+            let work_hours_needed = build_work_hours_for(&b.name);
+            if work_hours_needed <= 0.0 {
                 b.material_progress = Some(1.0);
-                if next >= 1.0 {
-                    b.finished = 1;
-                    newly_finished.push((b.id, b.name.clone()));
+                b.build_progress = Some(1.0);
+                b.finished = 1;
+                newly_finished.push((b.id, b.name.clone()));
+                continue;
+            }
+            if builder_hours <= 1e-9 {
+                break;
+            }
+            let dist = (b.x - dc_x).abs() + (b.y - dc_y).abs();
+            let eff = distance_efficiency(dist);
+
+            // Phase 1: haul construction materials from District Center to the site
+            let mat_prog = b.material_progress.unwrap_or(0.0);
+            if mat_prog < 1.0 {
+                let total_items: f64 = lookup_spec(&b.name)
+                    .map(|s| s.costs.iter().map(|(_, amt)| *amt as f64).sum::<f64>())
+                    .unwrap_or(10.0)
+                    .max(1.0);
+                let haul_hours_total = total_items / (HAUL_ITEMS_PER_BUILDER_HOUR * eff);
+                let haul_hours_rem = (1.0 - mat_prog) * haul_hours_total;
+                let spent = builder_hours.min(haul_hours_rem);
+                builder_hours -= spent;
+                let next_mat = (mat_prog + spent / haul_hours_total).min(1.0);
+                b.material_progress = Some(next_mat);
+                if next_mat >= 1.0 - 1e-9 {
+                    b.material_progress = Some(1.0);
+                    b.has_materials = Some(1);
+                } else {
+                    continue;
                 }
+            }
+
+            // Phase 2: perform construction work-hours once materials are delivered
+            if builder_hours <= 1e-9 {
+                break;
+            }
+            let build_prog = b.build_progress.unwrap_or(0.0);
+            let build_hours_total = work_hours_needed / eff;
+            let build_hours_rem = (1.0 - build_prog) * build_hours_total;
+            let spent = builder_hours.min(build_hours_rem);
+            builder_hours -= spent;
+            let next_build = (build_prog + spent / build_hours_total).min(1.0);
+            b.build_progress = Some(next_build);
+            if next_build >= 1.0 - 1e-9 {
+                b.build_progress = Some(1.0);
+                b.finished = 1;
+                newly_finished.push((b.id, b.name.clone()));
             }
         }
         for (id, name) in newly_finished {
@@ -1055,14 +1197,17 @@ impl MockWorld {
             ));
         }
 
-        // Production scaled by verified work hours (hours/day * dt)
-        let work_hours_dt = (self.work_end_hours as f64) * dt;
+        // Production scaled by verified work hours (hours/day * dt) and walking distance efficiency
         let mut water_cap = 300.0_f64; // District Center base storage
         let mut water_prod = 0.0_f64;
         let mut crop_harvest_cap = 0.0_f64;
         let mut berry_prod = 0.0_f64;
         let mut log_prod = 0.0_f64;
         let mut plank_prod = 0.0_f64;
+        let mut gear_prod = 0.0_f64;
+        let mut treated_plank_prod = 0.0_f64;
+        let mut metal_prod = 0.0_f64;
+        let mut forester_plant_cap = 0.0_f64;
         let mut science_prod = 0.0_f64;
         let mut fermented_prod = 0.0_f64;
 
@@ -1088,46 +1233,91 @@ impl MockWorld {
             if workers <= 0.0 {
                 continue;
             }
+            let eff = distance_efficiency((b.x - dc_x).abs() + (b.y - dc_y).abs());
             if b.name.contains("LargeWaterPump") {
                 if self.reservoir_water_depth > 0.05
                     && self.river_contamination < IRRIGATION_POLLUTION_CUTOFF
                 {
-                    water_prod += workers * LARGE_WATER_PUMP_PER_HOUR * work_hours_dt;
+                    water_prod += workers * LARGE_WATER_PUMP_PER_HOUR * work_hours_dt * eff;
                 }
             } else if b.name.contains("DeepWaterPump") {
                 if self.reservoir_water_depth > 0.02
                     && self.river_contamination < IRRIGATION_POLLUTION_CUTOFF
                 {
-                    water_prod += workers * WATER_PUMP_PER_HOUR * work_hours_dt;
+                    water_prod += workers * WATER_PUMP_PER_HOUR * work_hours_dt * eff;
                 }
             } else if b.name.contains("WaterPump") {
                 if self.reservoir_water_depth > 0.05
                     && self.river_contamination < IRRIGATION_POLLUTION_CUTOFF
                 {
-                    water_prod += workers * WATER_PUMP_PER_HOUR * work_hours_dt;
+                    water_prod += workers * WATER_PUMP_PER_HOUR * work_hours_dt * eff;
                 }
             } else if b.name.contains("FarmHouse") || b.name.contains("Farmhouse") {
                 // Farmers can harvest up to ~2.5 crop units/hr each; total food is bounded
                 // by actual grown crop tiles (`crop_spec`: Carrot 3/4d, Kohlrabi 2/3d).
-                crop_harvest_cap += workers * 2.5 * work_hours_dt;
+                crop_harvest_cap += workers * 2.5 * work_hours_dt * eff;
             } else if b.name.contains("GathererFlag") && !self.gatherables.is_empty() {
                 let bush_factor = (self.gatherables.len() as f64 / 12.0).clamp(0.25, 1.0);
-                berry_prod += workers * 2.4 * bush_factor * work_hours_dt;
+                berry_prod += workers * 2.4 * bush_factor * work_hours_dt * eff;
             } else if b.name.contains("LumberjackFlag") {
-                let marked = self
+                let marked_grown = self
                     .trees
                     .iter()
-                    .filter(|t| t.alive == 1 && t.marked == Some(1))
+                    .filter(|t| t.alive == 1 && t.marked == Some(1) && t.grown == Some(1))
                     .count();
-                if marked > 0 {
-                    log_prod += workers * 0.75 * work_hours_dt;
+                if marked_grown > 0 {
+                    log_prod += workers * 0.75 * work_hours_dt * eff;
                 }
+            } else if b.name.contains("Forester") {
+                forester_plant_cap += workers * FORESTER_PLANT_PER_HOUR * work_hours_dt * eff;
             } else if b.name.contains("Inventor") {
-                science_prod += workers * INVENTOR_SP_PER_HOUR * work_hours_dt;
+                science_prod += workers * INVENTOR_SP_PER_HOUR * work_hours_dt * eff;
             } else if b.name.contains("LumberMill") && b.powered == Some(1) {
-                plank_prod += workers * LUMBER_MILL_PLANKS_PER_HOUR * work_hours_dt;
+                plank_prod += workers * LUMBER_MILL_PLANKS_PER_HOUR * work_hours_dt * eff;
+            } else if b.name.contains("GearWorkshop") && b.powered == Some(1) {
+                gear_prod += workers * GEAR_WORKSHOP_GEARS_PER_HOUR * work_hours_dt * eff;
+            } else if b.name.contains("WoodWorkshop") && b.powered == Some(1) {
+                treated_plank_prod +=
+                    workers * WOOD_WORKSHOP_TREATED_PER_HOUR * work_hours_dt * eff;
+            } else if b.name.contains("Smelter") && b.powered == Some(1) {
+                metal_prod += workers * SMELTER_METAL_PER_HOUR * work_hours_dt * eff;
             } else if b.name.contains("Fermenter") && b.powered == Some(1) {
-                fermented_prod += workers * FERMENTER_OUTPUT_PER_HOUR * work_hours_dt;
+                fermented_prod += workers * FERMENTER_OUTPUT_PER_HOUR * work_hours_dt * eff;
+            }
+        }
+
+        // Grow trees using verified multi-day growth durations (`tree_spec`: Birch 9d, Pine 12d, Oak 30d).
+        // Trees require irrigation to grow.
+        for t in &mut self.trees {
+            if t.alive != 1 {
+                continue;
+            }
+            let (grow_days, _) = tree_spec(&t.name);
+            let mut g = t.growth.unwrap_or(0.0);
+            if irrigated && g < 1.0 {
+                g = (g + dt / grow_days).min(1.0);
+                t.growth = Some(g);
+                t.grown = Some(if g >= 1.0 { 1 } else { 0 });
+            }
+        }
+
+        // Staffed Forester plants new Pine saplings (`growth = 0.0`, 12d to mature) when irrigated
+        if irrigated && forester_plant_cap >= 1.0 && self.trees.len() < 120 {
+            let to_plant = (forester_plant_cap.floor() as usize).min(120 - self.trees.len());
+            for _ in 0..to_plant {
+                let idx = self.trees.len() as i32;
+                let id = self.alloc_id();
+                self.trees.push(Plant {
+                    id,
+                    name: "Pine".to_string(),
+                    x: 22 + (idx % 8),
+                    y: 10 + (idx / 8) % 10,
+                    z: 2,
+                    alive: 1,
+                    growth: Some(0.0),
+                    grown: Some(0),
+                    marked: Some(1),
+                });
             }
         }
 
@@ -1173,12 +1363,45 @@ impl MockWorld {
         *self.resources.entry("Berries".to_string()).or_insert(0.0) += berry_prod;
         *self.resources.entry("Log".to_string()).or_insert(0.0) += log_prod;
 
-        // Lumber Mill converts 1 Log -> 1 Plank
+        // Material precedence chain:
+        // 1. Lumber Mill (powered): 1 Log -> 1 Plank
         if plank_prod > 0.0 {
             let logs_avail = *self.resources.get("Log").unwrap_or(&0.0);
             let actual_planks = plank_prod.min(logs_avail);
             *self.resources.entry("Log".to_string()).or_insert(0.0) -= actual_planks;
             *self.resources.entry("Plank".to_string()).or_insert(0.0) += actual_planks;
+        }
+        // 2. Gear Workshop (powered): 1 Plank -> 1 Gear
+        if gear_prod > 0.0 {
+            let planks_avail = *self.resources.get("Plank").unwrap_or(&0.0);
+            let actual_gears = gear_prod.min(planks_avail);
+            *self.resources.entry("Plank".to_string()).or_insert(0.0) -= actual_gears;
+            *self.resources.entry("Gear".to_string()).or_insert(0.0) += actual_gears;
+        }
+        // 3. Wood Workshop (powered): 1 Plank + 1 PineResin -> 1 TreatedPlank
+        if treated_plank_prod > 0.0 {
+            let planks_avail = *self.resources.get("Plank").unwrap_or(&0.0);
+            let resin_avail = *self.resources.get("PineResin").unwrap_or(&0.0);
+            let actual_treated = treated_plank_prod.min(planks_avail).min(resin_avail);
+            *self.resources.entry("Plank".to_string()).or_insert(0.0) -= actual_treated;
+            *self.resources.entry("PineResin".to_string()).or_insert(0.0) -= actual_treated;
+            *self
+                .resources
+                .entry("TreatedPlank".to_string())
+                .or_insert(0.0) += actual_treated;
+        }
+        // 4. Smelter (powered): 2 ScrapMetal -> 1 MetalBlock
+        if metal_prod > 0.0 {
+            let scrap_avail = *self.resources.get("ScrapMetal").unwrap_or(&0.0);
+            let actual_metal = metal_prod.min(scrap_avail / 2.0);
+            *self
+                .resources
+                .entry("ScrapMetal".to_string())
+                .or_insert(0.0) -= actual_metal * 2.0;
+            *self
+                .resources
+                .entry("MetalBlock".to_string())
+                .or_insert(0.0) += actual_metal;
         }
 
         // Fermenter converts 4 Cassava -> 10 FermentedCassava
@@ -1799,30 +2022,32 @@ impl MockWorld {
         let max_x = x1.max(x2).min(self.map_size.x as i32 - 1);
         let min_y = y1.min(y2).max(0);
         let max_y = y1.max(y2).min(self.map_size.y as i32 - 1);
-        let irrigated = self.reservoir_water_depth > 0.05
-            && self.river_contamination < IRRIGATION_POLLUTION_CUTOFF;
         let mut out = Vec::new();
         for y in min_y..=max_y {
+            let row_idx = (y as usize).min(self.river_depth.len().saturating_sub(1));
+            let row_depth = self
+                .river_depth
+                .get(row_idx)
+                .copied()
+                .unwrap_or(self.reservoir_water_depth);
+            let row_contam = self
+                .river_contam
+                .get(row_idx)
+                .copied()
+                .unwrap_or(self.river_contamination);
+            let row_irrigated = row_depth > 0.05 && row_contam < IRRIGATION_POLLUTION_CUTOFF;
             for x in min_x..=max_x {
                 // River runs along x in 9..=11
                 let in_river = (9..=11).contains(&x);
                 let terrain = if in_river { 1 } else { 2 };
-                let water = if in_river {
-                    self.reservoir_water_depth
-                } else {
-                    0.0
-                };
-                let badwater = if in_river {
-                    self.river_contamination
-                } else {
-                    0.0
-                };
+                let water = if in_river { row_depth } else { 0.0 };
+                let badwater = if in_river { row_contam } else { 0.0 };
                 let contaminated = if in_river && badwater >= IRRIGATION_POLLUTION_CUTOFF {
                     1
                 } else {
                     0
                 };
-                let moist = if (7..=14).contains(&x) && irrigated {
+                let moist = if (7..=14).contains(&x) && row_irrigated {
                     1
                 } else {
                     0
@@ -1930,6 +2155,28 @@ impl MockWorld {
         }
     }
 
+    pub fn unlock_building(&mut self, building: &str) -> Result<u32, String> {
+        let Some(idx) = self.unlockables.iter().position(|u| u.name == building) else {
+            return Err(format!("not_found: unknown unlockable '{building}'"));
+        };
+        if self.unlockables[idx].unlocked == 1 {
+            return Ok(self.science);
+        }
+        let cost = self.unlockables[idx].cost;
+        if self.science < cost {
+            return Err(format!(
+                "insufficient_science: need {cost}, have {}",
+                self.science
+            ));
+        }
+        self.science -= cost;
+        self.unlockables[idx].unlocked = 1;
+        if let Some(p) = self.prefabs.iter_mut().find(|p| p.name == building) {
+            p.unlocked = true;
+        }
+        Ok(self.science)
+    }
+
     pub fn place_building(&mut self, req: &PlaceBuildingRequest) -> Result<Value, String> {
         if req.x < 0
             || req.y < 0
@@ -1969,7 +2216,7 @@ impl MockWorld {
             }
         }
 
-        let instant = req.prefab.contains("Path") || req.prefab.contains("Flag");
+        let instant = build_work_hours_for(&req.prefab) <= 0.0;
         let id = self.alloc_id();
         let spec = lookup_spec(&req.prefab);
         let sb = ScenarioBuilding {
@@ -2156,8 +2403,8 @@ fn make_building(id: i64, sb: &ScenarioBuilding) -> Building {
         power_demand: Some(0.0),
         power_supply: Some(0.0),
         build_progress: Some(if sb.finished { 1.0 } else { 0.0 }),
-        material_progress: Some(1.0),
-        has_materials: Some(1),
+        material_progress: Some(if sb.finished { 1.0 } else { 0.0 }),
+        has_materials: Some(if sb.finished { 1 } else { 0 }),
         stock: Some(0),
         capacity,
         storage_mode: sb.storage_mode.clone(),
